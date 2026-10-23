@@ -411,6 +411,21 @@ input:checked + .slider:before{transform:translateX(18px)}
 .edge-closure-metric b{display:block;margin-top:5px;font-size:20px;line-height:1.2;color:var(--text)}
 .edge-closure-metric small{display:block;margin-top:5px;color:var(--text3);font-size:11px;white-space:normal;line-height:1.45}
 @media(max-width:900px){.edge-closure-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.terminal-shell{border-radius:12px;overflow:hidden;border:1px solid #263142;background:#0d1117;box-shadow:0 12px 30px rgba(5,12,24,.24)}
+.terminal-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;background:#151b24;border-bottom:1px solid #263142;color:#cbd5e1}
+.terminal-bar b{font-size:12px}.terminal-bar span{font-size:11px;color:#8b98aa}
+.terminal-output{min-height:320px;max-height:52vh;overflow:auto;padding:14px;margin:0;background:#0d1117;color:#d7e0ea;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.terminal-command-row{display:flex;align-items:center;gap:8px;padding:10px;border-top:1px solid #263142;background:#111821}
+.terminal-prompt{font:12px ui-monospace,Menlo,monospace;color:#59d98e;white-space:nowrap}
+.terminal-command-row input{flex:1;min-width:0;border:1px solid #334155;border-radius:7px;background:#0b1220;color:#e2e8f0;padding:9px 10px;outline:none;font:12px ui-monospace,Menlo,monospace}
+.terminal-command-row input:focus{border-color:#4b8bf5;box-shadow:0 0 0 2px rgba(75,139,245,.16)}
+.terminal-target-card{display:grid;gap:7px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:#f8f9fc}
+.terminal-target-card b{font-size:13px}.terminal-target-card code{overflow-wrap:anywhere}
+.terminal-meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.terminal-meta-grid>div{padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:#fff;min-width:0}
+.terminal-meta-grid span{display:block;color:var(--text3);font-size:11px}.terminal-meta-grid b{display:block;margin-top:5px;overflow-wrap:anywhere}
+.terminal-session-command{font:11px ui-monospace,Menlo,monospace;background:#f5f7fb;border-radius:6px;padding:7px 8px;margin-top:6px;overflow-wrap:anywhere}
+@media(max-width:700px){.terminal-meta-grid{grid-template-columns:1fr}.terminal-output{min-height:260px}.terminal-command-row{align-items:stretch}.terminal-command-row .btn{justify-content:center}}
 .edge-console .edge-hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;gap:24px;padding:24px 26px;margin-bottom:16px;border:1px solid #dfe5f6;border-radius:16px;background:linear-gradient(115deg,#f5f7ff 0%,#f8fbff 55%,#f3faf9 100%)}
 .edge-console .edge-hero:after{content:"";position:absolute;width:220px;height:220px;right:12%;top:-145px;border:1px solid rgba(83,104,202,.12);border-radius:50%;box-shadow:0 0 0 28px rgba(83,104,202,.035),0 0 0 56px rgba(83,104,202,.025);pointer-events:none}
 .edge-console .edge-hero-main{display:flex;align-items:center;gap:15px;min-width:0;position:relative;z-index:1}
@@ -1321,6 +1336,7 @@ function renderSidebar(){
     { id:'cloud-edge', name:'云边端协同', icon:ico.cloud, group:'平台', capability:'cloud-edge' },
     { id:'secrets', name:'配置中心', icon:ico.secrets, group:'平台' },
     { id:'releases', name:'发布中心', icon:ico.workloads, group:'平台' },
+    { id:'terminals', name:'终端会话', icon:ico.monitor, group:'平台' },
     { id:'monitor', name:'监控告警', icon:ico.monitor, group:'平台' }
   ].filter(item=>!item.capability||isCapabilityEnabled(item.capability));
   const groups = {};
@@ -3773,10 +3789,12 @@ function render(){
   else if (state.view === 'cloud-edge') { main.innerHTML = isCapabilityEnabled('cloud-edge')?viewCloudEdge():viewCapabilities(); decorateCloudEdgeClosure(); }
   else if (state.view === 'secrets') main.innerHTML = viewSecrets();
   else if (state.view === 'releases') main.innerHTML = viewReleases();
+  else if (state.view === 'terminals') main.innerHTML = typeof viewTerminalSessions==='function'?viewTerminalSessions():'';
   else if (state.view === 'monitor') main.innerHTML = viewMonitor();
   else if (state.view === 'create-app') main.innerHTML = viewCreateApp();
   else if(state.view === 'app'){ main.innerHTML = viewAppDetail(); drawEdges(); }
   else if(state.view === 'workload') main.innerHTML = viewWorkload();
+  if(typeof decorateTerminalEntryPoints==='function')decorateTerminalEntryPoints();
   
   window.scrollTo(0,0);
 }
@@ -3829,6 +3847,217 @@ function backToApp(){ state.view = 'app'; state.tab = 'workload'; render(); }
 
 // 初始化
 render();
+</script>
+<script id="terminal-domain-core">
+/* Framework-free terminal access and session policy shared by UI and tests. */
+(function(root){
+  const TERMINAL_STATES=Object.freeze(['requested','awaiting_approval','active','ended','terminated','expired','denied']);
+  const TERMINAL_TRANSITIONS=Object.freeze({
+    requested:['active','awaiting_approval','denied'],
+    awaiting_approval:['active','denied'],
+    active:['ended','terminated','expired'],
+    ended:[],
+    terminated:[],
+    expired:[],
+    denied:[]
+  });
+  const TERMINAL_ROLES=Object.freeze(['viewer','operator','admin']);
+  const DEFAULT_TTL_SECONDS=900;
+  const DEFAULT_IDLE_TIMEOUT_SECONDS=300;
+  const clone=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
+  const randomId=()=>`term-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+  const isoAt=(value,offsetSeconds=0)=>new Date(new Date(value).getTime()+offsetSeconds*1000).toISOString();
+  const normalize=value=>String(value??'').trim();
+
+  function canTerminalTransition(from,to){
+    return from===to || (TERMINAL_TRANSITIONS[from]||[]).includes(to);
+  }
+  function evaluateTerminalAccess({role='viewer',target={},reason=''}={}){
+    const normalizedRole=TERMINAL_ROLES.includes(role)?role:'viewer';
+    const normalizedTarget=clone(target||{});
+    const normalizedReason=normalize(reason);
+    if(!normalizedReason){
+      return {allowed:false,initialStatus:'denied',approvalRequired:false,reason:'terminal access reason is required',ttlSeconds:DEFAULT_TTL_SECONDS,idleTimeoutSeconds:DEFAULT_IDLE_TIMEOUT_SECONDS};
+    }
+    if(normalizedRole==='viewer'){
+      return {allowed:false,initialStatus:'denied',approvalRequired:false,reason:'viewer role cannot open terminal sessions',ttlSeconds:DEFAULT_TTL_SECONDS,idleTimeoutSeconds:DEFAULT_IDLE_TIMEOUT_SECONDS};
+    }
+    if(!['pod','edge-node','cloud-node'].includes(normalizedTarget.type)){
+      return {allowed:false,initialStatus:'denied',approvalRequired:false,reason:'unsupported terminal target type',ttlSeconds:DEFAULT_TTL_SECONDS,idleTimeoutSeconds:DEFAULT_IDLE_TIMEOUT_SECONDS};
+    }
+    if(normalizedTarget.available===false){
+      return {allowed:false,initialStatus:'denied',approvalRequired:false,reason:'terminal target is unavailable',ttlSeconds:DEFAULT_TTL_SECONDS,idleTimeoutSeconds:DEFAULT_IDLE_TIMEOUT_SECONDS};
+    }
+    const approvalRequired=normalizedRole==='operator'&&normalizedTarget.type==='cloud-node';
+    return {
+      allowed:true,
+      initialStatus:approvalRequired?'awaiting_approval':'active',
+      approvalRequired,
+      reason:approvalRequired?'operator cloud-node access requires approval':'terminal access granted',
+      ttlSeconds:DEFAULT_TTL_SECONDS,
+      idleTimeoutSeconds:DEFAULT_IDLE_TIMEOUT_SECONDS
+    };
+  }
+  function createTerminalAudit(session,action,options={}){
+    return {
+      id:`taudit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,
+      time:options.now||new Date().toISOString(),
+      sessionId:session?.id||null,
+      action,
+      from:options.from??null,
+      to:options.to??null,
+      actor:session?.actor||options.actor||'当前用户',
+      role:session?.role||options.role||'viewer',
+      target:clone(session?.target||options.target||null),
+      command:options.command||null,
+      risk:options.risk||null,
+      result:options.result||'recorded',
+      exitCode:options.exitCode??null,
+      reason:options.reason||null
+    };
+  }
+  function createTerminalSession({id,actor,role,reason,target,access,now}={}){
+    const accessResult=access||evaluateTerminalAccess({role,target,reason});
+    const timestamp=now||new Date().toISOString();
+    const session={
+      id:id||randomId(),
+      actor:actor||'当前用户',
+      role:role||'viewer',
+      reason:normalize(reason),
+      target:clone(target||{}),
+      status:accessResult.initialStatus,
+      requestedAt:timestamp,
+      approvedAt:null,
+      approvedBy:null,
+      startedAt:accessResult.initialStatus==='active'?timestamp:null,
+      expiresAt:isoAt(timestamp,accessResult.ttlSeconds||DEFAULT_TTL_SECONDS),
+      endedAt:null,
+      ttlSeconds:accessResult.ttlSeconds||DEFAULT_TTL_SECONDS,
+      idleTimeoutSeconds:accessResult.idleTimeoutSeconds||DEFAULT_IDLE_TIMEOUT_SECONDS,
+      commands:[],
+      recording:[],
+      audit:[]
+    };
+    session.audit.push(createTerminalAudit(session,'session-opened',{now:timestamp,to:session.status,result:accessResult.allowed?'accepted':'denied',reason:accessResult.reason}));
+    return session;
+  }
+  function transitionTerminalSession(session,to,options={}){
+    const from=session?.status||'requested';
+    if(!session||!canTerminalTransition(from,to)){
+      return {ok:false,session,from,to,audit:createTerminalAudit(session,'transition-blocked',{...options,from,to,result:'denied'})};
+    }
+    session.status=to;
+    if(to==='active'){
+      session.startedAt=session.startedAt||options.now||new Date().toISOString();
+      session.approvedAt=options.now||new Date().toISOString();
+      session.approvedBy=options.approvedBy||options.actor||'system-policy';
+    }
+    if(['ended','terminated','expired','denied'].includes(to)){
+      session.endedAt=options.now||new Date().toISOString();
+    }
+    const audit=createTerminalAudit(session,'session-state-changed',{...options,from,to,result:options.result||'accepted'});
+    session.audit=session.audit||[];
+    session.audit.push(audit);
+    return {ok:true,session,from,to,audit};
+  }
+  function classifyTerminalCommand(command){
+    const value=normalize(command);
+    const rules=[
+      [/rm\s+-rf\s+\/(?:\s|$)/i,'recursive root filesystem deletion'],
+      [/mkfs(?:\.\w+)?\s+/i,'filesystem formatting'],
+      [/\bdd\s+if=.*\bof=\/dev\//i,'block-device write'],
+      [/\b(?:shutdown|reboot|poweroff|halt)\b/i,'host power operation'],
+      [/\bkubectl\s+(?:delete\s+(?:node|namespace)|drain)\b/i,'cluster-wide destructive operation'],
+      [/:\(\)\s*\{\s*:\|:&\s*\}\s*;:/,'fork bomb']
+    ];
+    const matched=rules.find(([pattern])=>pattern.test(value));
+    return matched?{risk:'blocked',allowed:false,reason:matched[1]}:{risk:'safe',allowed:true,reason:'command allowed'};
+  }
+  function isTerminalSessionExpired(session,now=new Date().toISOString(),lastActivityAt=null){
+    if(!session||session.status!=='active')return true;
+    const nowMs=new Date(now).getTime();
+    if(Number.isFinite(new Date(session.expiresAt).getTime())&&nowMs>=new Date(session.expiresAt).getTime())return true;
+    const activity=lastActivityAt||session.lastActivityAt||session.startedAt||session.requestedAt;
+    return Number.isFinite(new Date(activity).getTime())&&nowMs-new Date(activity).getTime()>=Number(session.idleTimeoutSeconds||DEFAULT_IDLE_TIMEOUT_SECONDS)*1000;
+  }
+  function maskSensitiveOutput(value){
+    return String(value??'').replace(/\b([A-Z0-9_]*(?:PASSWORD|SECRET|TOKEN|API_KEY|ACCESS_KEY)[A-Z0-9_]*\s*=\s*)[^\s]+/gi,'$1[REDACTED]');
+  }
+  function runSimulatedCommand({session,command,now=new Date().toISOString()}={}){
+    const value=normalize(command);
+    const classification=classifyTerminalCommand(value);
+    const expired=isTerminalSessionExpired(session,now,session?.lastActivityAt);
+    let blocked=expired||!session||session.status!=='active'||!classification.allowed;
+    let exitCode=blocked?(expired?125:126):0;
+    let output='';
+    let result=expired?'expired':classification.allowed?'success':'blocked';
+    if(expired){
+      output='Session expired. Open a new terminal session.\n';
+    }else if(!classification.allowed){
+      output=`Command blocked by terminal policy: ${classification.reason}.\n`;
+    }else if(!value||value==='help'){
+      output='Simulated terminal commands: whoami, pwd, ls, date, cat /app/version, ps, uptime, exit\n';
+    }else if(value==='whoami'){
+      output=`${session.actor}\n`;
+    }else if(value==='pwd'){
+      output=session.target.type==='pod'?'/app\n':'/home/cloudforge\n';
+    }else if(value==='ls'){
+      output='app  config  logs  tmp\n';
+    }else if(value==='date'){
+      output=`${new Date(now).toISOString()}\n`;
+    }else if(value==='cat /app/version'){
+      output=`${session.target.version||'unknown'}\n`;
+    }else if(value==='ps'){
+      output='PID TTY          TIME CMD\n  1 ?        00:00:03 cloudforge-app\n';
+    }else if(value==='edge-agent status'){
+      output=`edge-agent: ${session.target.available===false?'offline':'online'} · ${session.target.id}\n`;
+    }else if(value==='sync status'){
+      output=`sequence=${Number(session.target.syncSequence)||0} desired=${session.target.desiredVersion||'unknown'} observed=${session.target.observedVersion||'unknown'}\n`;
+    }else if(value==='hostname'){
+      output=`${session.target.name||session.target.id}\n`;
+    }else if(value==='uptime'){
+      output=' up 12 days, 3:21, 2 users, load average: 0.31, 0.42, 0.38\n';
+    }else if(value==='free -h'){
+      output='              total        used        free\nMem:           15Gi       8.2Gi       3.1Gi\n';
+    }else if(value==='df -h'){
+      output='Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1        80G   42G   34G  56% /\n';
+    }else if(value==='env'){
+      output=maskSensitiveOutput('DB_PASSWORD=demo-secret\nLOG_LEVEL=info\n');
+    }else if(value==='exit'){
+      output='logout\n';
+    }else{
+      exitCode=127;result='not-found';output=`${value}: command not found in simulated ${session.target.type} terminal\n`;
+    }
+    const audit=createTerminalAudit(session,'command',{now,command:value,risk:classification.risk,result,exitCode});
+    if(session){
+      session.lastActivityAt=now;
+      session.commands=session.commands||[];
+      session.commands.push({command:value,risk:classification.risk,result,exitCode,blocked,time:now});
+      session.recording=session.recording||[];
+      session.recording.push({time:now,type:'command',command:value,output,blocked,exitCode});
+      session.audit=session.audit||[];
+      session.audit.push(audit);
+    }
+    return {output,exitCode,blocked,result,classification,audit};
+  }
+
+  root.CloudForgeTerminalDomain=Object.freeze({
+    TERMINAL_STATES,
+    TERMINAL_TRANSITIONS,
+    TERMINAL_ROLES,
+    DEFAULT_TTL_SECONDS,
+    DEFAULT_IDLE_TIMEOUT_SECONDS,
+    canTerminalTransition,
+    evaluateTerminalAccess,
+    createTerminalAudit,
+    createTerminalSession,
+    transitionTerminalSession,
+    classifyTerminalCommand,
+    isTerminalSessionExpired,
+    maskSensitiveOutput,
+    runSimulatedCommand
+  });
+})(typeof globalThis!=='undefined'?globalThis:this);
 </script>
 <script id="release-domain-core">
 /* Framework-free release domain core shared by the prototype and Node tests. */
@@ -4391,6 +4620,327 @@ render();
     return result;
   };
   window.releaseResultVerifier={policy:'发布任务成功不等于应用全局版本一致；只有目标镜像、就绪状态与切流结果通过校验，才更新应用当前版本。',simulated:true};
+})();
+</script>
+
+<script>
+/* Unified terminal access gateway: simulated by default, WebSocket-ready interface. */
+(function(){
+  const domain=window.CloudForgeTerminalDomain;
+  const STORAGE_KEY='cloudforge-terminal-sessions-v1';
+  let TERMINAL_SESSIONS=[];
+  let terminalLoginTarget=null;
+  let terminalActiveSessionId=null;
+
+  function persistTerminalSessions(){
+    try{localStorage.setItem(STORAGE_KEY,JSON.stringify({version:1,sessions:TERMINAL_SESSIONS}));}catch(error){console.warn('Terminal session persistence failed.',error);}
+  }
+  function loadTerminalSessions(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
+      TERMINAL_SESSIONS=Array.isArray(saved?.sessions)?saved.sessions:Array.isArray(saved)?saved:[];
+      let changed=false;
+      TERMINAL_SESSIONS.forEach(session=>{
+        if(session.status==='active'&&domain.isTerminalSessionExpired(session,new Date().toISOString(),session.lastActivityAt)){domain.transitionTerminalSession(session,'expired',{reason:'session expired while browser was closed'});changed=true;}
+        if(session.status==='awaiting_approval'&&new Date(session.expiresAt).getTime()<=Date.now()){domain.transitionTerminalSession(session,'denied',{reason:'approval window expired'});changed=true;}
+      });
+      if(changed)persistTerminalSessions();
+    }catch(error){console.warn('Terminal session restore failed.',error);TERMINAL_SESSIONS=[];}
+  }
+  function getSession(id){return TERMINAL_SESSIONS.find(session=>session.id===id)||null;}
+  function targetForWorkload(workloadId,podIndex=0){
+    const workload=WORKLOADS[workloadId],link=componentForWorkload(workloadId),app=link?.app||getApp(workload?._ownerAppId),component=link?.component;
+    const pod=workload?.pods?.[Number(podIndex)||0]||workload?.pods?.[0]||null;
+    const namespace=app?.mesh?.namespace||app?.namespace||(app?`${app.id}-default`:'default');
+    return {
+      type:'pod',id:pod?`${workloadId}/${pod.name}`:workloadId,name:pod?.name||workloadDisplayName(workloadId,workload||{}),
+      available:!!pod&&pod.status==='Running',podName:pod?.name||'',podIndex:Number(podIndex)||0,node:pod?.node||'',
+      workloadId,appId:app?.id||workload?._ownerAppId||null,componentId:component?.id||null,namespace,
+      containerName:component?.name||'app',version:imageVersionTag(workload?.image)||'unknown',
+      contextLabel:`${app?.name||'独立资源'} / ${component?.name||workloadDisplayName(workloadId,workload||{})}`
+    };
+  }
+  function targetForEdgeNode(nodeId){
+    const node=EDGE_NODES.find(item=>item.id===nodeId);
+    const deployment=TARGET_DEPLOYMENTS.find(item=>item.targetId===nodeId);
+    return node?{
+      type:'edge-node',id:node.id,name:node.name,available:node.status==='online',status:node.status,
+      site:node.site,region:node.region,agentVersion:node.version,syncSequence:Number(node.syncSequence)||0,
+      desiredVersion:deployment?.desiredVersion||'',observedVersion:deployment?.observedVersion||'',
+      contextLabel:`${node.site} / ${node.region}`
+    }:null;
+  }
+  function targetForCloudNode(nodeName){
+    const node=CLUSTER_NODES.find(item=>item.name===nodeName);
+    return node?{
+      type:'cloud-node',id:node.name,name:node.name,available:node.status==='Ready',status:node.status,
+      ip:node.ip,role:node.role,contextLabel:`${node.role} / ${node.ip}`
+    }:null;
+  }
+  function createSession(target,options={}){
+    const actor=String(options.actor||'张明').trim(),role=options.role||'operator',reason=String(options.reason||'').trim();
+    if(!target)return {ok:false,access:{allowed:false,reason:'terminal target does not exist'}};
+    const access=domain.evaluateTerminalAccess({role,target,reason});
+    if(Number(options.ttlSeconds)>0)access.ttlSeconds=Math.max(60,Math.min(3600,Number(options.ttlSeconds)));
+    const duplicate=TERMINAL_SESSIONS.find(session=>session.actor===actor&&session.target?.type===target.type&&session.target?.id===target.id&&['active','awaiting_approval'].includes(session.status));
+    if(duplicate)return {ok:true,duplicate:true,access,session:duplicate};
+    const session=domain.createTerminalSession({actor,role,reason,target,access});
+    TERMINAL_SESSIONS.unshift(session);
+    persistTerminalSessions();
+    return {ok:access.allowed,access,session};
+  }
+  function approveSession(id,options={}){
+    const session=getSession(id);
+    if(!session)return {ok:false,error:'session not found'};
+    if(session.status!=='awaiting_approval')return {ok:false,error:'session is not awaiting approval',session};
+    if(options.role!=='admin')return {ok:false,error:'admin role is required',session};
+    const result=domain.transitionTerminalSession(session,'active',{actor:options.actor||'管理员',approvedBy:options.actor||'管理员',reason:options.reason||'approved by administrator',result:'approved'});
+    if(result.ok)persistTerminalSessions();
+    return {...result,ok:result.ok,session,error:result.ok?null:'state transition denied'};
+  }
+  function endSession(id,reason='user ended terminal session'){
+    const session=getSession(id);
+    if(!session)return {ok:false,error:'session not found'};
+    const targetStatus=session.status==='awaiting_approval'?'denied':'ended';
+    const result=domain.transitionTerminalSession(session,targetStatus,{reason,result:targetStatus});
+    if(result.ok)persistTerminalSessions();
+    return {...result,session,ok:result.ok};
+  }
+  function terminateSession(id,reason='administrator terminated terminal session'){
+    const session=getSession(id);if(!session)return {ok:false,error:'session not found'};
+    const result=domain.transitionTerminalSession(session,'terminated',{actor:'管理员',reason,result:'terminated'});
+    if(result.ok)persistTerminalSessions();
+    return {...result,session,ok:result.ok};
+  }
+  function terminalTargetAvailability(target){
+    if(target?.type==='pod'){
+      const workload=WORKLOADS[target.workloadId];
+      const pod=workload?.pods?.find(item=>item.name===target.podName)||workload?.pods?.[Number(target.podIndex)||0];
+      return {available:!!pod&&pod.status==='Running',reason:pod?'pod is not running':'pod no longer exists'};
+    }
+    if(target?.type==='edge-node'){
+      const node=EDGE_NODES.find(item=>item.id===target.id);
+      return {available:node?.status==='online',reason:node?'edge node is offline':'edge node no longer exists'};
+    }
+    if(target?.type==='cloud-node'){
+      const node=CLUSTER_NODES.find(item=>item.name===target.id);
+      return {available:node?.status==='Ready',reason:node?'cloud node is not Ready':'cloud node no longer exists'};
+    }
+    return {available:false,reason:'unsupported terminal target'};
+  }
+  const simulatedGateway=Object.freeze({
+    mode:'simulation',
+    send(sessionId,command){
+      const session=getSession(sessionId);
+      if(!session)return {ok:false,blocked:true,output:'Session not found.\n',exitCode:1,session:null};
+      const availability=terminalTargetAvailability(session.target);
+      if(session.status==='active'&&!availability.available){
+        const now=new Date().toISOString();
+        const audit=domain.createTerminalAudit(session,'command',{now,command:String(command||''),risk:'safe',result:'target-unavailable',exitCode:126});
+        session.lastActivityAt=now;
+        session.commands=session.commands||[];
+        session.commands.push({command:String(command||''),risk:'safe',result:'target-unavailable',exitCode:126,blocked:true,time:now});
+        session.recording=session.recording||[];
+        session.recording.push({time:now,type:'command',command:String(command||''),output:'',blocked:true,exitCode:126});
+        session.audit=session.audit||[];
+        session.audit.push(audit);
+        persistTerminalSessions();
+        return {ok:false,blocked:true,output:`Terminal target unavailable: ${availability.reason}.\n`,exitCode:126,result:'target-unavailable',audit,session};
+      }
+      const result=domain.runSimulatedCommand({session,command,now:new Date().toISOString()});
+      persistTerminalSessions();
+      return {...result,ok:!result.blocked,session};
+    },
+    close(sessionId,reason){return endSession(sessionId,reason);},
+    resize(){return true;}
+  });
+  function createWebSocketTerminalGateway(options={}){
+    const endpoint=String(options.endpoint||'').trim();
+    return {
+      mode:'websocket',
+      endpoint,
+      open(session){if(!endpoint)return {ok:false,error:'WebSocket terminal endpoint is not configured',session};return {ok:false,error:'WebSocket terminal adapter is not connected in this prototype',session};},
+      send(sessionId){return {ok:false,blocked:true,output:'WebSocket terminal gateway is not connected.\n',exitCode:1,session:getSession(sessionId)};},
+      resize(){return false;},
+      close(sessionId,reason){return endSession(sessionId,reason);}
+    };
+  }
+
+  function terminalStateBadge(status){
+    const meta={requested:['已请求','gray'],awaiting_approval:['等待审批','amber'],active:['会话中','green'],ended:['已结束','gray'],terminated:['已终止','red'],expired:['已过期','amber'],denied:['已拒绝','red']}[status]||[status||'未知','gray'];
+    return `<span class="badge ${meta[1]}">${escapeHtml(meta[0])}</span>`;
+  }
+  function terminalTargetLabel(target){
+    const type={pod:'Pod', 'edge-node':'边缘节点','cloud-node':'云主机'}[target?.type]||'终端目标';
+    return `${type} · ${target?.name||target?.id||'未知目标'}`;
+  }
+  function openLogin(target){
+    if(!target)return alert('终端目标不存在。');
+    terminalLoginTarget=target;
+    const roleOptions=domain.TERMINAL_ROLES.map(role=>`<option value="${role}" ${role==='operator'?'selected':''}>${role==='viewer'?'只读用户':role==='operator'?'运维人员':'管理员'}</option>`).join('');
+    showModal(`<div class="modal-head"><div><h2>终端登录</h2><div class="sub">${escapeHtml(terminalTargetLabel(target))}</div></div><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="terminal-target-card"><b>${escapeHtml(terminalTargetLabel(target))}</b><div class="muted">${escapeHtml(target.contextLabel||target.namespace||target.ip||target.site||'')}</div><code>${escapeHtml(target.id)}</code>${target.type==='pod'?`<div class="muted">Pod ${escapeHtml(target.podName||'—')} · 容器 ${escapeHtml(target.containerName||'app')} · 命名空间 ${escapeHtml(target.namespace||'default')}</div>`:''}${target.type==='edge-node'?`<div class="muted">Agent ${escapeHtml(target.agentVersion||'—')} · 状态 ${escapeHtml(target.status||'unknown')}</div>`:''}${target.type==='cloud-node'?`<div class="muted">主机 ${escapeHtml(target.ip||'—')} · 状态 ${escapeHtml(target.status||'unknown')}</div>`:''}</div>
+      <div class="terminal-meta-grid"><div class="form-group"><label>操作者</label><input id="terminal-actor" class="form-control" value="张明"></div><div class="form-group"><label>角色</label><select id="terminal-role" class="form-control">${roleOptions}</select></div><div class="form-group"><label>会话时长</label><select id="terminal-ttl" class="form-control"><option value="300">5 分钟</option><option value="900" selected>15 分钟</option><option value="1800">30 分钟</option></select></div></div>
+      <div class="form-group"><label>登录原因 <span style="color:var(--red)">*</span></label><textarea id="terminal-reason" class="form-control" rows="2" placeholder="例如：排查 Pod 启动失败、确认边缘 Agent 同步状态"></textarea></div>
+      <div class="validation-box warn">${target.type==='cloud-node'?'云主机终端具有较高权限；operator 角色需要管理员审批。':'终端操作会记录会话、命令、退出码与风险等级。原型仅执行本地模拟命令。'}</div>
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="submitTerminalLogin()">登录终端</button></div>`);
+  }
+  function submitTerminalLogin(){
+    const target=terminalLoginTarget;
+    const actor=document.getElementById('terminal-actor')?.value.trim()||'张明';
+    const role=document.getElementById('terminal-role')?.value||'operator';
+    const reason=document.getElementById('terminal-reason')?.value.trim()||'';
+    const ttlSeconds=Number(document.getElementById('terminal-ttl')?.value)||900;
+    const result=createSession(target,{actor,role,reason,ttlSeconds});
+    if(!result.ok){
+      showModal(`<div class="modal-head"><div><h2>终端登录被拒绝</h2><div class="sub">${escapeHtml(terminalTargetLabel(target))}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="validation-box warn">${escapeHtml(result.access?.reason||'访问策略拒绝登录')}</div><div class="modal-actions"><button class="btn" onclick="openLogin(${JSON.stringify(target).replace(/"/g,'&quot;')})">返回修改</button><button class="btn primary" onclick="closeModal()">关闭</button></div>`);
+      return result;
+    }
+    openTerminalWindow(result.session.id);
+    return result;
+  }
+  function openTerminalWindow(sessionId){
+    const session=getSession(sessionId);if(!session)return alert('终端会话不存在。');
+    terminalActiveSessionId=session.id;
+    if(session.status==='awaiting_approval'){
+      showModal(`<div class="modal-head"><div><h2>等待管理员审批</h2><div class="sub">${escapeHtml(terminalTargetLabel(session.target))}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="validation-box warn">operator 登录云主机需要管理员审批。审批通过后会话才会激活。会话到期时间：${escapeHtml(session.expiresAt)}</div><div class="modal-actions"><button class="btn" onclick="endTerminalSession('${session.id}','approval cancelled')">取消申请</button><button class="btn primary" onclick="approveTerminalSession('${session.id}')">模拟管理员审批</button></div>`);
+      return;
+    }
+    if(session.status!=='active'){
+      showTerminalSessionDetails(session.id);
+      return;
+    }
+    const prior=(session.recording||[]).map(item=>`$ ${item.command}\n${item.output||''}`).join('');
+    const banner=`CloudForge Terminal Gateway · ${terminalTargetLabel(session.target)}\nSession ${session.id} · ${session.actor} (${session.role}) · simulated mode\nExpires ${session.expiresAt}\nType help for available commands.\n\n`;
+    showModal(`<div class="modal-head"><div><h2>终端会话</h2><div class="sub">${escapeHtml(terminalTargetLabel(session.target))} · ${escapeHtml(session.role)}</div></div><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="terminal-shell"><div class="terminal-bar"><b>${escapeHtml(session.target.name||session.target.id)}</b><span>${terminalStateBadge(session.status)} · ${escapeHtml(session.actor)} · ${escapeHtml(session.id)}</span></div><pre id="terminal-output" class="terminal-output">${escapeHtml(banner+prior)}</pre><form class="terminal-command-row" onsubmit="event.preventDefault();runTerminalCommand('${session.id}')"><span class="terminal-prompt">$</span><input id="terminal-command-input" autocomplete="off" spellcheck="false" placeholder="输入命令，例如 help、ps、cat /app/version"><button class="btn primary" type="submit">执行</button></form></div>
+      <div class="validation-box warn" style="margin-top:12px">危险命令会被策略阻断并写入审计。真实环境应使用后端短期凭证、WebSocket 网关和会话录制。</div><div class="modal-actions"><button class="btn" onclick="endTerminalSession('${session.id}','user closed terminal')">结束会话</button><button class="btn" onclick="showTerminalSessionDetails('${session.id}')">查看审计</button><button class="btn primary" onclick="closeModal()">后台保留</button></div>`);
+    setTimeout(()=>document.getElementById('terminal-command-input')?.focus(),0);
+  }
+  function appendTerminalOutput(text){
+    const output=document.getElementById('terminal-output');if(!output)return;
+    output.textContent+=String(text||'');output.scrollTop=output.scrollHeight;
+  }
+  function runTerminalCommand(sessionId){
+    const session=getSession(sessionId),input=document.getElementById('terminal-command-input');
+    if(!session||!input)return {ok:false};
+    const command=input.value.trim();if(!command)return {ok:false};
+    appendTerminalOutput(`$ ${command}\n`);
+    const result=simulatedGateway.send(sessionId,command);
+    input.value='';
+    if(result.output)appendTerminalOutput(result.output);
+    if(command==='exit'){endSession(sessionId,'exit command');appendTerminalOutput('Session ended.\n');input.disabled=true;}
+    else if(result.blocked)appendTerminalOutput(`[exit ${Number(result.exitCode)||126}]\n`);
+    input.focus();
+    return result;
+  }
+  function endTerminalSession(sessionId,reason='user ended terminal session'){
+    const result=endSession(sessionId,reason);terminalActiveSessionId=null;openTerminalWindow(sessionId);render();return result;
+  }
+  function terminateTerminalSession(sessionId,reason='administrator terminated session'){
+    const result=terminateSession(sessionId,reason);terminalActiveSessionId=null;openTerminalWindow(sessionId);render();return result;
+  }
+  function approveTerminalSession(sessionId){
+    const result=approveSession(sessionId,{actor:'张明',role:'admin',reason:'simulated administrator approval'});
+    if(!result.ok)return alert(result.error||'审批失败');
+    openTerminalWindow(sessionId);persistTerminalSessions();render();return result;
+  }
+  function showTerminalSessionDetails(sessionId){
+    const session=getSession(sessionId);if(!session)return;
+    const commands=(session.commands||[]).map(item=>`<div class="terminal-session-command"><b>${escapeHtml(item.command||'')}</b> · ${escapeHtml(item.risk||'safe')} · exit ${Number(item.exitCode)||0} · ${escapeHtml(item.result||'')}<div class="muted">${escapeHtml(item.time||'')}</div></div>`).join('');
+    const audit=(session.audit||[]).slice(-20).reverse().map(item=>`<div class="tl-item"><div class="tl-time">${escapeHtml(item.time||'—')}</div><div class="tl-body"><div class="r">${escapeHtml(item.action||'audit')} · ${escapeHtml(item.result||'recorded')}</div><div class="m">${escapeHtml(item.reason||item.command||'')}</div></div></div>`).join('');
+    showModal(`<div class="modal-head"><div><h2>终端会话审计</h2><div class="sub">${escapeHtml(terminalTargetLabel(session.target))}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="terminal-meta-grid"><div><span>状态</span><b>${terminalStateBadge(session.status)}</b></div><div><span>操作者</span><b>${escapeHtml(session.actor)} / ${escapeHtml(session.role)}</b></div><div><span>命令数</span><b>${(session.commands||[]).length}</b></div><div><span>开始时间</span><b>${escapeHtml(session.startedAt||session.requestedAt||'—')}</b></div><div><span>到期时间</span><b>${escapeHtml(session.expiresAt||'—')}</b></div><div><span>结束时间</span><b>${escapeHtml(session.endedAt||'—')}</b></div></div><div class="section-title">登录原因</div><div class="validation-box">${escapeHtml(session.reason||'—')}</div><div class="section-title">命令记录</div><div style="max-height:220px;overflow:auto">${commands||'<div class="empty">暂无命令</div>'}</div><div class="section-title">会话审计</div><div class="timeline" style="max-height:220px;overflow:auto">${audit||'<div class="empty">暂无审计</div>'}</div><div class="modal-actions"><button class="btn" onclick="closeModal()">关闭</button>${session.status==='active'?`<button class="btn primary" onclick="openTerminalWindow('${session.id}')">返回终端</button>`:''}${['active','awaiting_approval'].includes(session.status)?`<button class="btn danger" onclick="terminateTerminalSession('${session.id}','administrator terminated session')">强制终止</button>`:''}</div>`);
+  }
+  function viewTerminalSessions(){
+    const active=TERMINAL_SESSIONS.filter(item=>item.status==='active').length,awaiting=TERMINAL_SESSIONS.filter(item=>item.status==='awaiting_approval').length,ended=TERMINAL_SESSIONS.filter(item=>['ended','terminated','expired','denied'].includes(item.status)).length,blocked=TERMINAL_SESSIONS.reduce((sum,item)=>sum+(item.commands||[]).filter(command=>command.blocked).length,0);
+    const rows=TERMINAL_SESSIONS.map(session=>`<tr><td><b>${escapeHtml(terminalTargetLabel(session.target))}</b><div class="muted mono">${escapeHtml(session.target?.id||'')}</div></td><td>${escapeHtml(session.actor)}<div class="muted">${escapeHtml(session.role)}</div></td><td>${terminalStateBadge(session.status)}</td><td>${(session.commands||[]).length}</td><td>${(session.commands||[]).filter(item=>item.blocked).length}</td><td>${escapeHtml(session.requestedAt||'—')}<div class="muted">${escapeHtml(session.reason||'')}</div></td><td><div class="row-actions">${session.status==='active'?`<button class="btn sm primary" onclick="openTerminalWindow('${session.id}')">继续会话</button>`:''}${session.status==='awaiting_approval'?`<button class="btn sm primary" onclick="approveTerminalSession('${session.id}')">审批登录</button>`:''}<button class="btn sm" onclick="showTerminalSessionDetails('${session.id}')">审计</button>${['active','awaiting_approval'].includes(session.status)?`<button class="btn sm danger" onclick="terminateTerminalSession('${session.id}','session terminated from terminal center')">终止</button>`:''}</div></td></tr>`).join('');
+    return `<div class="page"><div class="page-head"><div><h1>终端会话</h1><div class="sub">统一管理 Pod、边缘节点和云主机登录权限、审批、命令录制与审计</div></div><button class="btn" onclick="openTerminalTargetPicker()">新建终端登录</button></div><div class="resource-stats"><div class="resource-stat"><div class="label">活动会话</div><div class="value" style="color:var(--green)">${active}</div><div class="hint">当前可交互终端</div></div><div class="resource-stat"><div class="label">等待审批</div><div class="value" style="color:var(--amber)">${awaiting}</div><div class="hint">高权限登录申请</div></div><div class="resource-stat"><div class="label">历史会话</div><div class="value">${ended}</div><div class="hint">已结束、终止或拒绝</div></div><div class="resource-stat"><div class="label">阻断命令</div><div class="value" style="color:${blocked?'var(--red)':'var(--green)'}">${blocked}</div><div class="hint">危险操作审计</div></div></div><table class="card"><thead><tr><th style="width:23%">目标</th><th style="width:13%">操作者</th><th style="width:11%">状态</th><th style="width:8%">命令</th><th style="width:8%">阻断</th><th style="width:22%">请求 / 原因</th><th style="width:15%">操作</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">暂无终端会话</td></tr>'}</tbody></table><div class="persist-note">会话、命令和审批记录保存在当前浏览器；真实环境应由后端终端网关控制临时凭证和会话录制。</div></div>`;
+  }
+  function openTerminalTargetPicker(){
+    const pods=[];Object.entries(WORKLOADS).forEach(([id,workload])=>(workload.pods||[]).slice(0,2).forEach((pod,index)=>pods.push({label:`Pod · ${pod.name}`,target:targetForWorkload(id,index)})));
+    const edges=EDGE_NODES.map(node=>({label:`边缘 · ${node.name}`,target:targetForEdgeNode(node.id)}));
+    const clouds=CLUSTER_NODES.map(node=>({label:`云主机 · ${node.name}`,target:targetForCloudNode(node.name)}));
+    const items=[...pods,...edges,...clouds].slice(0,30).map(item=>`<button class="select-resource-item" onclick='openLogin(${JSON.stringify(item.target).replace(/'/g,"&#39;")})'><span><b>${escapeHtml(item.label)}</b><small>${escapeHtml(item.target.contextLabel||item.target.id)}</small></span><span class="badge ${item.target.available?'green':'amber'}">${item.target.available?'可登录':'不可用'}</span></button>`).join('');
+    showModal(`<div class="modal-head"><div><h2>选择终端目标</h2><div class="sub">Pod、边缘节点与云主机统一登录入口</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="select-resource-list" style="max-height:58vh;overflow:auto">${items||'<div class="empty">暂无可用终端目标</div>'}</div><div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button></div>`);
+  }
+  function openPodTerminalForCurrent(){
+    const ctx=getActiveWorkloadContext();if(!ctx)return alert('未找到工作负载。');
+    const podIndex=(ctx.workload?.pods||[]).findIndex(pod=>pod.status==='Running');
+    if(podIndex<0)return alert('该工作负载当前没有 Running 状态的 Pod，无法登录终端。');
+    openLogin(targetForWorkload(ctx.workloadId,podIndex));
+  }
+  function openPodTerminal(workloadId,podIndex=0){openLogin(targetForWorkload(workloadId,podIndex));}
+  function openEdgeTerminal(nodeId){openLogin(targetForEdgeNode(nodeId));}
+  function openCloudNodeTerminal(nodeName){openLogin(targetForCloudNode(nodeName));}
+  function decorateTerminalEntryPoints(){
+    const main=document.getElementById('main');if(!main)return;
+    if(state.view==='workload'&&!document.getElementById('terminal-workload-entry')){
+      const actions=main.querySelector('.app-actions');
+      if(actions){const button=document.createElement('button');button.id='terminal-workload-entry';button.className='btn';button.textContent='Pod 终端';button.setAttribute('onclick','openPodTerminalForCurrent()');actions.insertBefore(button,actions.firstChild);}
+    }
+    if(state.view==='cluster'){
+      const table=main.querySelector('table');const headRow=table?.querySelector('thead tr');
+      if(table&&headRow&&!headRow.querySelector('[data-terminal-column]')){
+        const lastHeader=headRow.lastElementChild;if(lastHeader)lastHeader.style.width='6%';
+        const th=document.createElement('th');th.dataset.terminalColumn='1';th.style.width='6%';th.textContent='终端';headRow.appendChild(th);
+        [...table.querySelectorAll('tbody tr')].forEach(row=>{
+          const name=row.querySelector('td b')?.textContent?.trim();const td=document.createElement('td');td.dataset.terminalColumn='1';
+          const button=document.createElement('button');button.className='btn sm';button.textContent='SSH 登录';button.onclick=event=>{event.stopPropagation();openCloudNodeTerminal(name);};td.appendChild(button);row.appendChild(td);
+        });
+      }
+    }
+  }
+
+  loadTerminalSessions();
+  const originalOpenPodDetail=window.openPodDetail;
+  if(typeof originalOpenPodDetail==='function')window.openPodDetail=function(index){
+    const result=originalOpenPodDetail.apply(this,arguments);
+    const root=document.getElementById('modal-root'),ctx=getActiveWorkloadContext(),actions=root?.querySelector('.modal-actions');
+    if(ctx&&actions&&!root.querySelector('[data-terminal-pod-entry]')){const button=document.createElement('button');button.className='btn primary';button.dataset.terminalPodEntry='1';button.textContent='终端登录';button.onclick=()=>openLogin(targetForWorkload(ctx.workloadId,index));actions.insertBefore(button,actions.firstChild);}
+    return result;
+  };
+  const originalEdgeFocus=window.edgeFocusNode;
+  if(typeof originalEdgeFocus==='function')window.edgeFocusNode=function(id){
+    const result=originalEdgeFocus.apply(this,arguments);
+    const root=document.getElementById('modal-root'),actions=root?.querySelector('.modal-actions');
+    if(actions&&!root.querySelector('[data-terminal-edge-entry]')){const button=document.createElement('button');button.className='btn';button.dataset.terminalEdgeEntry='1';button.textContent='Agent 终端';button.setAttribute('onclick',`openEdgeTerminal('${id}')`);actions.insertBefore(button,actions.firstChild);}
+    return result;
+  };
+
+  window.CloudForgeTerminalApp=Object.freeze({
+    get sessions(){return TERMINAL_SESSIONS.slice();},
+    targetForWorkload,
+    targetForEdgeNode,
+    targetForCloudNode,
+    createSession,
+    approveSession,
+    getSession,
+    runCommand:(sessionId,command)=>simulatedGateway.send(sessionId,command),
+    endSession,
+    terminateSession,
+    openLogin,
+    openTerminalWindow,
+    openPodTerminal,
+    openEdgeTerminal,
+    openCloudNodeTerminal
+  });
+  window.CloudForgeTerminalGatewayFactories=Object.freeze({simulation:()=>simulatedGateway,websocket:createWebSocketTerminalGateway});
+  window.CloudForgeTerminalSessions=TERMINAL_SESSIONS;
+  window.viewTerminalSessions=viewTerminalSessions;
+  window.decorateTerminalEntryPoints=decorateTerminalEntryPoints;
+  window.openLogin=openLogin;
+  window.submitTerminalLogin=submitTerminalLogin;
+  window.openTerminalWindow=openTerminalWindow;
+  window.runTerminalCommand=runTerminalCommand;
+  window.endTerminalSession=endTerminalSession;
+  window.terminateTerminalSession=terminateTerminalSession;
+  window.approveTerminalSession=approveTerminalSession;
+  window.showTerminalSessionDetails=showTerminalSessionDetails;
+  window.openTerminalTargetPicker=openTerminalTargetPicker;
+  window.openPodTerminalForCurrent=openPodTerminalForCurrent;
+  window.openPodTerminal=openPodTerminal;
+  window.openEdgeTerminal=openEdgeTerminal;
+  window.openCloudNodeTerminal=openCloudNodeTerminal;
 })();
 </script>
 
