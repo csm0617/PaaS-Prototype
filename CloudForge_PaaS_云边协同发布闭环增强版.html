@@ -400,7 +400,17 @@ input:checked + .slider:before{transform:translateX(18px)}
 .incident-analysis{margin:14px 24px;padding:18px!important}.incident-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;margin-top:14px}.incident-card{border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface, #fff);min-width:0}.incident-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.incident-card p{color:var(--text2);font-size:12px;margin:9px 0}.incident-evidence{font-size:12px;background:var(--surface2,#f7f8fa);border-radius:7px;padding:9px 11px}.incident-evidence ul{margin:6px 0 0 17px;padding:0}.incident-evidence li{margin:4px 0;overflow-wrap:anywhere}.incident-next{font-size:12px;line-height:1.6;margin:10px 0}.incident-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.incident-modal-summary{margin:12px 0;padding:12px;border-radius:8px;background:var(--surface2,#f7f8fa)}.incident-modal-summary p{margin:8px 0 0;color:var(--text2);font-size:12px}.incident-modal-evidence{display:grid;gap:8px;margin:10px 0 18px}.incident-modal-event{display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--border);padding:8px 0;font-size:12px}.incident-modal-event>div{min-width:0;overflow-wrap:anywhere}.incident-modal-event small{display:block;color:var(--text2);margin-top:5px}.incident-steps{list-style:none;padding:0;display:grid;gap:9px;margin:12px 0 18px}.incident-steps li{display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.55}.incident-steps li>span{flex:0 0 24px;height:24px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-weight:700}.incident-analysis .panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 
 /* Cloud-edge console visual refinement */
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media(max-width:1100px){.grid-3,.grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .edge-console{max-width:1600px;margin:0 auto;padding-bottom:24px}
+.edge-closure-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-bottom:16px;border:1px solid #e1e6f0;border-radius:12px;overflow:hidden;background:#e1e6f0}
+.edge-closure-metric{padding:14px 16px;background:#fff;min-width:0}
+.edge-closure-metric span{display:block;font-size:11.5px;color:var(--text2)}
+.edge-closure-metric b{display:block;margin-top:5px;font-size:20px;line-height:1.2;color:var(--text)}
+.edge-closure-metric small{display:block;margin-top:5px;color:var(--text3);font-size:11px;white-space:normal;line-height:1.45}
+@media(max-width:900px){.edge-closure-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .edge-console .edge-hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;gap:24px;padding:24px 26px;margin-bottom:16px;border:1px solid #dfe5f6;border-radius:16px;background:linear-gradient(115deg,#f5f7ff 0%,#f8fbff 55%,#f3faf9 100%)}
 .edge-console .edge-hero:after{content:"";position:absolute;width:220px;height:220px;right:12%;top:-145px;border:1px solid rgba(83,104,202,.12);border-radius:50%;box-shadow:0 0 0 28px rgba(83,104,202,.035),0 0 0 56px rgba(83,104,202,.025);pointer-events:none}
 .edge-console .edge-hero-main{display:flex;align-items:center;gap:15px;min-width:0;position:relative;z-index:1}
@@ -784,7 +794,7 @@ function reconcileWorkloadBindings(){
       addBinding({
         role:'candidate',appId:app.id,componentId:target.componentId||null,workloadId:target.workloadId,
         releaseId:release.id,targetId:release.target?.id||null,
-        status:['pending','queued','validating','deploying','paused'].includes(release.status)?'active':'retired',
+        status:['pending','queued','validating','deploying','paused','rolling_back'].includes(release.status)?'active':'retired',
         createdAt:release.time||release.startedAt||new Date().toISOString()
       });
     });
@@ -934,7 +944,7 @@ function capabilitySetEnabled(id,enabled,options={}){
     if(active.length)return alert(`存在依赖服务网格的活动发布：${active[0].app.name} / ${active[0].r.version}。请先完成或取消后再停用。`);
   }
   if(!enabled&&current.enabled&&id==='cloud-edge'){
-    const active=(window.EDGE_RELEASES||[]).find(r=>!['success','cancelled','rolledback'].includes(edgeReleaseStateKey(r)));
+    const active=(window.EDGE_RELEASES||[]).find(r=>!['success','cancelled','rolled_back','partially_rolled_back'].includes(edgeReleaseStateKey(r)));
     if(active)return alert(`存在未完成的协同发布任务 ${active.id || active.version}。请先完成、取消或回滚后再停用。`);
   }
   if(!enabled&&current.enabled&&!options.skipConfirm){
@@ -996,7 +1006,7 @@ function cleanupCloudEdgeReferencesForComponents(appId,componentIds){
 }
 
 // 业务模型生命周期：应用状态与健康状态分开；组件引用主工作负载；工作负载保留独立资源身份。
-const RELEASE_ACTIVE_STATUSES=Object.freeze(['pending','queued','validating','deploying','paused']);
+const RELEASE_ACTIVE_STATUSES=Object.freeze(['draft','pending','queued','validating','deploying','paused','rolling_back']);
 function activeReleaseForApp(app){return (app?.releases||[]).find(r=>RELEASE_ACTIVE_STATUSES.includes(r.status));}
 function activeReleaseUsingWorkload(app,workloadId){
   return (app?.releases||[]).find(r=>RELEASE_ACTIVE_STATUSES.includes(r.status)&&(r.targetWorkloadIds||[]).includes(workloadId));
@@ -1110,7 +1120,7 @@ function validateWorkloadBindings(){
     if(binding.role==='candidate'){
       const release=app?.releases?.find(item=>item.id===binding.releaseId);
       if(!release)issues.push(`发布候选绑定 ${binding.id} 的发布任务不存在：${binding.releaseId}`);
-      else if(binding.status!=='retired'&&!['pending','queued','validating','deploying','paused'].includes(release.status))issues.push(`发布候选绑定 ${binding.id} 引用了非活动发布任务`);
+      else if(binding.status!=='retired'&&!['pending','queued','validating','deploying','paused','rolling_back'].includes(release.status))issues.push(`发布候选绑定 ${binding.id} 引用了非活动发布任务`);
     }
     if(['edge','target'].includes(binding.role)&&binding.targetDeploymentId&&!(window.TARGET_DEPLOYMENTS||[]).some(item=>item.id===binding.targetDeploymentId))issues.push(`目标绑定 ${binding.id} 的目标部署不存在：${binding.targetDeploymentId}`);
   });
@@ -1199,7 +1209,7 @@ function captureReleaseSnapshot(app, version, targetWorkloadIds=null){
   const gatewayRevision=ensureGatewayRevision(app);
   const targetIds=Array.isArray(targetWorkloadIds)?new Set(targetWorkloadIds):new Set([...(app.components||[]).flatMap(c=>componentWorkloadIds(c)),...Object.entries(WORKLOADS).filter(([id,w])=>w._ownerAppId===app.id).map(([id])=>id)]);
   const workloads={};
-  targetIds.forEach(id=>{const w=WORKLOADS[id];if(!w)return;const snap={id,name:workloadDisplayName(id,w),type:w.type,replicas:w.replicas,ready:w.ready,image:w.image,strategy:w.strategy,cpu:w.cpu,mem:w.mem,resources:w.resources||{},health:w.health,sidecar:w.sidecar||{}};workloads[id]=JSON.parse(JSON.stringify(snap));});
+  targetIds.forEach(id=>{const w=WORKLOADS[id];if(!w)return;const snap={id,name:workloadDisplayName(id,w),type:w.type,replicas:w.replicas,ready:w.ready,image:w.image,strategy:w.strategy,cpu:w.cpu,mem:w.mem,resources:w.resources||{},health:w.health,sidecar:w.sidecar||{},desiredVersion:w.desiredVersion||imageVersionTag(w.image),observedVersion:w.observedVersion||imageVersionTag(w.image),reconcileStatus:w.reconcileStatus||(w.health==='healthy'?'consistent':'degraded'),reconciledAt:w.reconciledAt||null};workloads[id]=JSON.parse(JSON.stringify(snap));});
   const components=(app.components||[]).map(component=>buildComponentSnapshotRecord(app,component,version||app.version));
   const trafficBaseline=getReleaseTrafficBaseline(app);
   return {appId:app.id,appVersion:app.version,version:version||app.version,env:app.env,mesh:JSON.parse(JSON.stringify(app.mesh||null)),trafficPolicy:JSON.parse(JSON.stringify(app.trafficPolicy||null)),gatewayConfig:JSON.parse(JSON.stringify(app.gatewayConfig||null)),routes:JSON.parse(JSON.stringify(app.routes||[])),gatewayRevision:JSON.parse(JSON.stringify(gatewayRevision||null)),trafficBaseline,components,workloads,configAssets:CONFIG_ASSETS.filter(x=>x.appId===app.id).map(x=>({id:x.id,name:x.name,kind:x.kind,namespace:x.namespace,data:(x.data||[]).map(kv=>({key:kv.key,value:x.kind==='Secret'?'[REDACTED]':kv.value}))})),capturedAt:new Date().toLocaleString()};
@@ -2361,17 +2371,43 @@ function openPublishForComponent(appId,compId){
 function bumpReleaseExecutionToken(release){release.executionToken=(Number(release.executionToken)||0)+1;return release.executionToken;}
 function isReleaseExecutionCurrent(release,token){return !!release&&Number(release.executionToken)===Number(token)&&release.status==='deploying';}
 function recordReleaseEvent(release,type,reason,msg){release.events=release.events||[];release.events.unshift({type,time:new Date().toLocaleString(),reason,msg});}
+function createReleaseAudit(release,action,from,to,options={}){
+  const domain=window.CloudForgeReleaseDomain;
+  const trafficBefore=options.trafficBefore??release?.trafficBefore??release?.snapshot?.trafficBaseline??null;
+  const trafficAfter=options.trafficAfter??null;
+  const event=domain?.createAuditEvent?domain.createAuditEvent({
+    releaseId:release?.id||null,action,from,to,
+    actor:options.actor||release?.operator||'当前用户',
+    reason:options.reason||'状态迁移',
+    health:options.health||null,
+    result:options.result||'accepted',
+    trafficBefore,trafficAfter,
+    baselineVersion:options.baselineVersion||release?.versionBefore||release?.snapshot?.appVersion||null
+  }):{
+    id:`audit-${Date.now().toString(36)}`,time:new Date().toISOString(),releaseId:release?.id||null,action,from,to,
+    actor:options.actor||release?.operator||'当前用户',reason:options.reason||'状态迁移',health:options.health||null,
+    result:options.result||'accepted',trafficBefore,trafficAfter,baselineVersion:options.baselineVersion||release?.versionBefore||null
+  };
+  if(release){release.audit=release.audit||[];release.audit.unshift(event);}
+  return event;
+}
 const RELEASE_STATUS_TRANSITIONS=Object.freeze({
+  draft:['queued','cancelled'],
   queued:['deploying','cancelled','failed'],
-  pending:['deploying','cancelled','failed'],
-  deploying:['paused','cancelled','success','failed'],
-  paused:['deploying','cancelled','failed'],
-  failed:['deploying'],
-  cancelled:['deploying'],
-  success:[]
+  pending:['queued','deploying','cancelled','failed'],
+  deploying:['validating','paused','rolling_back','cancelled','failed'],
+  validating:['success','paused','rolling_back','cancelled','failed'],
+  paused:['deploying','rolling_back','cancelled','failed'],
+  rolling_back:['rolled_back','partially_rolled_back','failed'],
+  rolled_back:[],
+  partially_rolled_back:['rolling_back'],
+  success:[],
+  failed:['deploying','rolling_back','cancelled'],
+  cancelled:['deploying','rolling_back']
 });
 function releaseTransitionAllowed(from,to){
   if(from===to)return true;
+  if(window.CloudForgeReleaseDomain?.canReleaseTransition)return window.CloudForgeReleaseDomain.canReleaseTransition(from,to);
   return (RELEASE_STATUS_TRANSITIONS[from]||[]).includes(to);
 }
 function transitionReleaseStatus(release,to,options={}){
@@ -2380,11 +2416,19 @@ function transitionReleaseStatus(release,to,options={}){
   if(!releaseTransitionAllowed(from,to)){
     release.events=release.events||[];
     recordReleaseEvent(release,'Warning','ReleaseTransitionBlocked',options.blockedMessage||`状态机拒绝非法转换：${from} → ${to}`);
+    createReleaseAudit(release,options.action||`transition:${to}`,from,to,{
+      reason:options.reason||'非法状态转换',result:'denied',health:options.health,
+      trafficBefore:options.trafficBefore,trafficAfter:options.trafficAfter
+    });
     return false;
   }
   release.status=to;
   release.transitionHistory=release.transitionHistory||[];
   release.transitionHistory.unshift({from,to,time:new Date().toLocaleString(),reason:options.reason||'状态迁移'});
+  createReleaseAudit(release,options.action||`transition:${to}`,from,to,{
+    reason:options.reason||'状态迁移',result:options.result||'accepted',health:options.health,
+    trafficBefore:options.trafficBefore,trafficAfter:options.trafficAfter,baselineVersion:options.baselineVersion
+  });
   if(options.message)recordReleaseEvent(release,options.type||'Normal',options.reason||'ReleaseStatusChanged',options.message);
   return true;
 }
@@ -2420,7 +2464,8 @@ function confirmPublish(){
   if(strategy.includes('灰度')&&(!hasPrimary||!hasCandidate))strategyIssues.push('灰度发布需要同时选择稳定主工作负载和独立候选工作负载');
   if(check.issues.length||strategyIssues.length){runReleasePreflight();return alert('发布预检查未通过：\n'+[...check.issues,...strategyIssues].join('\n'));}
   const notes=(document.getElementById('release-notes')?.value||'').trim()||'未填写变更说明',startedAt=new Date().toLocaleString();
-  const releaseTargets=check.order.map((id,index)=>{const row=check.rows.find(x=>x.id===id),w=WORKLOADS[id],isPrimary=!!row?.component&&row.component.workloadId===id;return {id:`${'rel-'+Date.now().toString(36)}-target-${index+1}`,releaseId:null,workloadId:id,componentId:row?.component?.id||null,role:isPrimary?'primary':'candidate',workloadName:workloadDisplayName(id,w),imageBefore:w?.image||'',imageTarget:(w?.image||'').replace(/:[^/:]+$/,'')+':'+version,trafficWeight:strategy.includes('灰度')?(isPrimary?90:10):strategy.includes('蓝绿')?(isPrimary?0:100):null,status:'pending'};});
+  const releaseTargets=check.order.map((id,index)=>{const row=check.rows.find(x=>x.id===id),w=WORKLOADS[id],isPrimary=!!row?.component&&row.component.workloadId===id,observedVersion=w?.observedVersion||imageVersionTag(w?.image);return {id:`${'rel-'+Date.now().toString(36)}-target-${index+1}`,releaseId:null,workloadId:id,componentId:row?.component?.id||null,role:isPrimary?'primary':'candidate',workloadName:workloadDisplayName(id,w),imageBefore:w?.image||'',imageTarget:(w?.image||'').replace(/:[^/:]+$/,'')+':'+version,desiredVersion:version,observedVersion,reconcileStatus:window.CloudForgeReleaseDomain?.reconcileVersionState?.({desiredVersion:version,observedVersion,ready:w?.ready,replicas:w?.replicas,nodeOnline:true}).reconcileStatus||(observedVersion===version?'consistent':'drift'),trafficWeight:strategy.includes('灰度')?(isPrimary?90:10):strategy.includes('蓝绿')?(isPrimary?0:100):null,status:'pending'};});
+  check.order.forEach(id=>{const w=WORKLOADS[id];if(!w)return;w.desiredVersion=version;w.observedVersion=w.observedVersion||imageVersionTag(w.image);w.reconcileStatus=window.CloudForgeReleaseDomain?.reconcileVersionState?.({desiredVersion:version,observedVersion:w.observedVersion,ready:w.ready,replicas:w.replicas,nodeOnline:true}).reconcileStatus||(w.observedVersion===version?'consistent':'drift');w.reconciledAt=new Date().toISOString();});
   const releaseId='rel-'+Date.now().toString(36);releaseTargets.forEach(t=>t.releaseId=releaseId);
   const snapshot=captureReleaseSnapshot(app,version,targetIds),trafficBefore=snapshot.trafficBaseline;
   const release={id:releaseId,version,status:'pending',strategy,notes,time:startedAt,operator:app.owner||'当前用户',current:false,targetWorkloadIds:[...targetIds],releaseTargets,deploymentOrder:[...check.order],healthGate,simulateFailure:!!document.getElementById('release-simulate-failure')?.checked,snapshot,versionBefore:app.version,versionAfter:version,trafficBefore,trafficHistory:[{time:startedAt,phase:`发布前基线（${trafficBefore.phase}）`,primaryWeight:trafficBefore.primaryWeight,candidateWeight:trafficBefore.candidateWeight}],attempts:0,executionToken:1,progress:0,phase:'已创建',completedWorkloadIds:[],taskStates:Object.fromEntries(check.order.map(id=>[id,'pending'])),events:[{type:'Normal',time:startedAt,reason:'ReleaseCreated',msg:`创建发布任务，目标工作负载 ${targetIds.length} 个，策略：${strategy}`} ]};
@@ -2460,11 +2505,14 @@ function markReleaseWorkloadSuccess(release, id, workload, from, to){
   workload.history=workload.history||[];workload.events=workload.events||[];
   workload.history.unshift({id:`${release.id}-${(release.attempts||0)+1}-${id}`,from,to,status:'success',time:new Date().toLocaleString(),strategy:release.strategy,releaseId:release.id,releaseVersion:release.version,healthGate:release.healthGate});
   workload.image=to;workload.ready=Number(workload.replicas)||0;workload.health=workload.ready?'healthy':'degraded';
+  workload.desiredVersion=release.version;workload.observedVersion=imageVersionTag(to)||release.version;
+  workload.reconcileStatus=workload.ready?'consistent':'degraded';workload.reconciledAt=new Date().toISOString();
   workload.pods=mkPods(workloadDisplayName(id,workload),workload.replicas||0);workload.pods.forEach(p=>p.age='刚刚');
   workload.sidecar=workload.sidecar||{};workload.sidecar.version=release.version;
   workload.events.unshift({type:'Normal',time:new Date().toLocaleTimeString(),reason:'ReleaseWorkloadUpdated',msg:`发布任务 ${release.version} 更新工作负载成功；任务 ID ${release.id}`});
   release.taskStates=release.taskStates||{};release.taskStates[id]='success';
   (release.releaseTargets||[]).filter(t=>t.workloadId===id).forEach(t=>t.status='success');
+  (release.releaseTargets||[]).filter(t=>t.workloadId===id).forEach(t=>{t.observedVersion=workload.observedVersion;t.reconcileStatus=workload.reconcileStatus;t.reconciledAt=workload.reconciledAt;});
   release.completedWorkloadIds=release.completedWorkloadIds||[];
   if(!release.completedWorkloadIds.includes(id))release.completedWorkloadIds.push(id);
   recordReleaseEvent(release,'Normal','WorkloadReleaseSucceeded',`工作负载 ${workloadDisplayName(id,workload)} 更新至 ${release.version} 成功`);
@@ -2480,7 +2528,7 @@ async function executeReleasePlan(appId, releaseId, fullOrder, executionToken){
   const pauseForGate=(id,index)=>{
     const live=getApp(appId),r=live?.releases?.find(x=>x.id===releaseId),w=WORKLOADS[id];
     if(!live||!r||!w||!isReleaseExecutionCurrent(r,executionToken))return;
-    w.ready=Math.max(0,(Number(w.replicas)||1)-1);w.health='degraded';w.events=w.events||[];
+    w.ready=Math.max(0,(Number(w.replicas)||1)-1);w.health='degraded';w.reconcileStatus='degraded';w.reconciledAt=new Date().toISOString();w.events=w.events||[];
     w.events.unshift({type:'Warning',time:new Date().toLocaleTimeString(),reason:'ProgressDeadlineExceeded',msg:`发布 ${r.version} 时新副本未就绪，健康门禁暂停后续步骤`});
     if(!transitionReleaseStatus(r,'paused',{reason:'HealthGatePaused',message:`发布暂停：${workloadDisplayName(id,w)} 未通过模拟健康检查`})){
       live.deployStatus='deploying';persistDemoState();return;
@@ -2533,11 +2581,11 @@ async function executeReleasePlan(appId, releaseId, fullOrder, executionToken){
   }
   const live=getApp(appId),r=live?.releases?.find(x=>x.id===releaseId);
   if(!live||!r||!isReleaseExecutionCurrent(r,executionToken))return;
-  if(!transitionReleaseStatus(r,'success',{reason:'ReleaseCompleted',message:`${r.version} 发布执行完成，等待应用版本一致性校验`}))return;
+  if(!transitionReleaseStatus(r,'validating',{reason:'ReleaseValidationStarted',message:`${r.version} 发布执行完成，进入版本一致性校验`}))return;
   r.phase='执行完成，等待版本校验';r.progress=100;r.time=new Date().toLocaleString();
-  live.deployStatus='deploying';
+  live.deployStatus='validating';
   persistDemoState();
-  const status=document.getElementById('app-release-status');if(status)status.textContent='成功';
+  const status=document.getElementById('app-release-status');if(status)status.textContent='校验中';
   const note=document.querySelector('#modal-root .validation-box.warn');
   if(note)note.textContent=strategy.includes('蓝绿')?'候选工作负载已通过模拟健康门禁，流量已切换到候选池；稳定池保留用于回滚。':strategy.includes('灰度')?'已完成 10% → 50% → 100% 的模拟流量阶段；稳定池保留用于回滚。':'所有选定工作负载已按依赖顺序完成模拟滚动更新。';
   const actions=document.querySelector('#modal-root .modal-actions');
@@ -2561,15 +2609,31 @@ function resumePausedRelease(appId,releaseId){
   showModal(`<div class="modal-head"><div><h2>恢复发布任务</h2><div class="sub">${escapeHtml(r.version)} · ${escapeHtml(r.strategy)}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="validation-box warn">已模拟修复未就绪副本，将跳过已成功目标并按原策略继续。此处不代表真实集群修复。</div><div class="modal-actions"><button class="btn" onclick="closeModal()">后台继续</button><button class="btn danger" onclick="cancelReleaseTask('${appId}','${releaseId}')">取消任务</button></div>`);
   executeReleasePlan(appId,releaseId,[...(r.deploymentOrder||r.targetWorkloadIds||[])],token);
 }
+function pauseReleaseTask(appId,releaseId){
+  const app=getApp(appId),r=app?.releases?.find(item=>item.id===releaseId);
+  if(!app||!r||!['deploying','validating'].includes(r.status))return alert('只有执行中或校验中的发布任务可以暂停');
+  bumpReleaseExecutionToken(r);
+  if(!transitionReleaseStatus(r,'paused',{action:'pause',reason:'ManualPause',health:r.versionConsistency?.checks?.[0]?.health||null,message:'用户手动暂停发布任务，后续未执行步骤已冻结'}))return;
+  r.phase='人工暂停';r.pauseReason='用户手动暂停';r.time=new Date().toLocaleString();
+  r.taskStates=r.taskStates||{};
+  Object.keys(r.taskStates).forEach(id=>{if(['running','pending'].includes(r.taskStates[id]))r.taskStates[id]='paused';});
+  (r.releaseTargets||[]).forEach(target=>{if(['running','pending'].includes(target.status))target.status='paused';});
+  if(typeof window.restoreReleaseTrafficBaseline==='function')window.restoreReleaseTrafficBaseline(app,r,'人工暂停');
+  app.deployStatus='paused';
+  recordReleaseEvent(r,'Warning','ReleasePausedByUser','用户手动暂停发布；执行代次已失效，后续定时回调不会继续推进');
+  persistDemoState();
+  showModal(`<div class="modal-head"><div><h2>发布任务已暂停</h2><div class="sub">${escapeHtml(r.version)} · ${escapeHtml(r.strategy||'发布')}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="validation-box warn">未执行目标已冻结，蓝绿/灰度临时流量已恢复到发布前基线。可恢复任务继续执行，或取消并保留当前已完成状态。</div><div class="modal-actions"><button class="btn" onclick="closeModal()">后台保留</button><button class="btn primary" onclick="closeModal();resumePausedRelease('${appId}','${releaseId}')">恢复任务</button><button class="btn danger" onclick="cancelReleaseTask('${appId}','${releaseId}')">取消任务</button></div>`);
+  render();
+}
 function releaseStatusMeta(status){
-  const map={success:['成功','green'],deploying:['发布中','amber'],paused:['已暂停','amber'],failed:['失败','red'],cancelled:['已取消','gray'],partial:['部分成功','amber'],pending:['等待执行','gray'],queued:['排队中','gray']};return map[status]||[status||'未知','gray'];
+  const map={success:['成功','green'],deploying:['发布中','amber'],validating:['校验中','blue'],paused:['已暂停','amber'],rolling_back:['回滚中','blue'],rolled_back:['已回滚','gray'],partially_rolled_back:['部分回滚','amber'],failed:['失败','red'],cancelled:['已取消','gray'],partial:['部分成功','amber'],pending:['等待执行','gray'],queued:['排队中','gray'],draft:['草稿','gray']};return map[status]||[status||'未知','gray'];
 }
 function openReleaseTaskDetails(releaseId){
   const app=getApp(state.appId);if(!app)return;const r=ensureReleaseData(app).find(x=>x.id===releaseId);if(!r)return alert('发布任务不存在');
   const [label,color]=releaseStatusMeta(r.status),ids=r.deploymentOrder||r.targetWorkloadIds||[];
   const taskRows=ids.map((id,i)=>{const w=WORKLOADS[id],st=r.taskStates?.[id]||((r.completedWorkloadIds||[]).includes(id)?'success':'pending');const m=({success:['成功','green'],running:['执行中','amber'],paused:['暂停','amber'],rolled_back:['已回滚','blue'],failed:['失败','red'],pending:['等待中','gray']})[st]||[st,'gray'];return `<div class="release-row"><span class="release-dot" style="background:${m[1]==='green'?'var(--green)':m[1]==='red'?'var(--red)':'var(--amber)'}"></span><div style="flex:1"><b>${escapeHtml(workloadDisplayName(id,w))}</b><div class="release-meta">执行顺序 ${i+1} · 当前镜像 ${escapeHtml(w?.image||'资源不存在')} · 期望/就绪 ${Number(w?.replicas)||0}/${Number(w?.ready)||0}</div></div><span class="badge ${m[1]}">${m[0]}</span></div>`;}).join('');
   const events=(r.events||[]).map(e=>`<div class="tl-item"><div class="tl-time">${escapeHtml(e.time||'—')}</div><div class="tl-body"><div class="r"><span class="badge ${e.type==='Warning'?'amber':'gray'}">${escapeHtml(e.type||'Normal')}</span><span>${escapeHtml(e.reason||'Event')}</span></div><div class="m">${escapeHtml(e.msg||'')}</div></div></div>`).join('')||'<div class="empty">暂无任务事件</div>';
-  showModal(`<div class="modal-head"><div><h2>发布任务详情</h2><div class="sub">${escapeHtml(r.version)} · ${escapeHtml(r.id||'历史记录')}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="resource-stats"><div class="resource-stat"><div class="label">任务状态</div><div class="value" style="font-size:16px">${label}</div></div><div class="resource-stat"><div class="label">执行进度</div><div class="value">${Number(r.progress)||0}%</div></div><div class="resource-stat"><div class="label">重试次数</div><div class="value">${Number(r.attempts)||0}</div></div></div><div class="section-title">目标工作负载</div>${taskRows||'<div class="empty">该记录未保存目标工作负载明细</div>'}<div class="section-title" style="margin-top:14px">任务事件</div><div class="timeline">${events}</div><div class="validation-box warn">任务采用执行代次保护：取消、恢复或重试后，过期的定时回调不会继续修改资源。${r.recoveryState==='completed-targets-rolled-back'?'已完成目标已恢复到发布前镜像；可重新检查后重试，配置不会随部分回滚自动恢复。':''}状态与事件仍来自本地演示数据，不代表真实集群控制器状态。</div><div class="modal-actions"><button class="btn" onclick="openReleaseHistory()">返回发布记录</button>${['failed','cancelled'].includes(r.status)?`<button class="btn primary" onclick="retryReleaseTask('${app.id}','${r.id}')">重试任务</button>`:''}${r.status==='deploying'?`<button class="btn danger" onclick="cancelReleaseTask('${app.id}','${r.id}')">取消任务</button>`:''}${r.status==='paused'?`<button class="btn primary" onclick="closeModal();resumePausedRelease('${app.id}','${r.id}')">恢复任务</button>`:''}${['paused','failed','cancelled'].includes(r.status)&&(r.completedWorkloadIds||[]).length?`<button class="btn danger" onclick="rollbackCompletedReleaseTargets('${app.id}','${r.id}')">回滚已完成目标</button>`:''}</div>`);
+  showModal(`<div class="modal-head"><div><h2>发布任务详情</h2><div class="sub">${escapeHtml(r.version)} · ${escapeHtml(r.id||'历史记录')}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="resource-stats"><div class="resource-stat"><div class="label">任务状态</div><div class="value" style="font-size:16px">${label}</div></div><div class="resource-stat"><div class="label">执行进度</div><div class="value">${Number(r.progress)||0}%</div></div><div class="resource-stat"><div class="label">重试次数</div><div class="value">${Number(r.attempts)||0}</div></div></div><div class="section-title">目标工作负载</div>${taskRows||'<div class="empty">该记录未保存目标工作负载明细</div>'}<div class="section-title" style="margin-top:14px">任务事件</div><div class="timeline">${events}</div><div class="validation-box warn">任务采用执行代次保护：取消、恢复或重试后，过期的定时回调不会继续修改资源。${r.recoveryState==='completed-targets-rolled-back'?'已完成目标已恢复到发布前镜像；可重新检查后重试，配置不会随部分回滚自动恢复。':''}状态与事件仍来自本地演示数据，不代表真实集群控制器状态。</div><div class="modal-actions"><button class="btn" onclick="openReleaseHistory()">返回发布记录</button>${['failed','cancelled'].includes(r.status)?`<button class="btn primary" onclick="retryReleaseTask('${app.id}','${r.id}')">重试任务</button>`:''}${['deploying','validating','paused'].includes(r.status)?`<button class="btn danger" onclick="cancelReleaseTask('${app.id}','${r.id}')">取消任务</button>`:''}${r.status==='paused'?`<button class="btn primary" onclick="closeModal();resumePausedRelease('${app.id}','${r.id}')">恢复任务</button>`:''}${['paused','failed','cancelled'].includes(r.status)&&(r.completedWorkloadIds||[]).length?`<button class="btn danger" onclick="rollbackCompletedReleaseTargets('${app.id}','${r.id}')">回滚已完成目标</button>`:''}</div>`);
 }
 function rollbackCompletedReleaseTargets(appId,releaseId){
   const app=getApp(appId),r=app?.releases?.find(x=>x.id===releaseId);
@@ -2578,25 +2642,28 @@ function rollbackCompletedReleaseTargets(appId,releaseId){
   if(!completed.length)return alert('该任务没有已成功的目标，无需部分回滚');
   const names=completed.map(id=>workloadDisplayName(id,WORKLOADS[id])).join('、');
   if(!confirm(`将已成功目标恢复到本次发布前的镜像：${names}。未完成目标保持不变，是否继续？`))return;
+  if(!transitionReleaseStatus(r,'rolling_back',{action:'rollback',reason:'CompletedTargetsRollbackStarted',message:'开始回滚已完成目标，发布执行已冻结'}))return;
   const now=new Date().toLocaleString(),rolled=[];
   completed.forEach(id=>{
     const w=WORKLOADS[id];if(!w)return;
     const target=(r.releaseTargets||[]).find(t=>t.workloadId===id);
     const previous=target?.imageBefore||r.snapshot?.workloads?.[id]?.image;
-    if(previous){const from=w.image;w.image=previous;w.sidecar=w.sidecar||{};const tag=String(previous).split(':').pop();w.sidecar.version=tag||w.sidecar.version;w.ready=Number(w.replicas)||0;w.health=w.ready?'healthy':'degraded';w.updatedAt=now;w.resourceVersion=(Number(w.resourceVersion)||0)+1;w.events=w.events||[];w.events.unshift({type:'Warning',time:now,reason:'PartialReleaseRollback',msg:`发布任务 ${r.version} 部分回滚：${from} → ${previous}`});rolled.push(id);}
+    if(previous){const from=w.image;w.image=previous;w.sidecar=w.sidecar||{};const tag=imageVersionTag(previous);w.sidecar.version=tag||w.sidecar.version;w.ready=Number(w.replicas)||0;w.health=w.ready?'healthy':'degraded';w.desiredVersion=tag||r.versionBefore||'';w.observedVersion=tag||w.desiredVersion;w.reconcileStatus=w.ready?'consistent':'degraded';w.reconciledAt=new Date().toISOString();w.updatedAt=now;w.resourceVersion=(Number(w.resourceVersion)||0)+1;w.events=w.events||[];w.events.unshift({type:'Warning',time:now,reason:'PartialReleaseRollback',msg:`发布任务 ${r.version} 部分回滚：${from} → ${previous}`});rolled.push(id);}
     if(r.taskStates)r.taskStates[id]='rolled_back';
     (r.releaseTargets||[]).filter(t=>t.workloadId===id).forEach(t=>t.status='rolled_back');
   });
   r.completedWorkloadIds=(r.completedWorkloadIds||[]).filter(id=>!rolled.includes(id));
   r.recoveryState='completed-targets-rolled-back';r.recoveryTime=now;r.phase='已回滚已完成目标';r.time=now;
+  const targetCount=new Set(r.targetWorkloadIds||[]).size,finalStatus=rolled.length>=targetCount?'rolled_back':'partially_rolled_back';
+  transitionReleaseStatus(r,finalStatus,{action:'rollback',reason:'CompletedTargetsRolledBack',health:{rolled:rolled.length,targets:targetCount},message:`已回滚 ${rolled.length}/${targetCount} 个完成目标`});
   recordReleaseEvent(r,'Warning','CompletedTargetsRolledBack',`已将 ${rolled.length} 个已完成目标恢复到发布前镜像；未完成目标未变更，可重新检查后重试`);
   const otherActive=(app.releases||[]).filter(x=>x.id!==r.id&&RELEASE_ACTIVE_STATUSES.includes(x.status));
-  app.deployStatus=otherActive.some(x=>x.status==='deploying')?'deploying':otherActive.some(x=>x.status==='paused')?'paused':r.status==='paused'?'paused':'failed';
+  app.deployStatus=otherActive.some(x=>x.status==='deploying')?'deploying':otherActive.some(x=>x.status==='paused')?'paused':finalStatus==='rolled_back'?'cancelled':'partial';
   persistDemoState();persistConfigAssets();closeModal();render();
-  alert(`部分回滚完成：${rolled.length} 个目标已恢复。此操作仅回滚镜像与模拟就绪状态，不会自动恢复运行配置或真实集群资源。`);
+  alert(`${finalStatus==='rolled_back'?'回滚完成':'部分回滚完成'}：${rolled.length} 个目标已恢复。此操作仅回滚镜像与模拟就绪状态，不会自动恢复运行配置或真实集群资源。`);
 }
 function cancelReleaseTask(appId,releaseId){
-  const app=getApp(appId),r=app?.releases?.find(x=>x.id===releaseId);if(!app||!r||r.status!=='deploying')return alert('只有执行中的发布任务可以取消');
+  const app=getApp(appId),r=app?.releases?.find(x=>x.id===releaseId);if(!app||!r||!['deploying','validating','paused'].includes(r.status))return alert('只有执行中、校验中或已暂停的发布任务可以取消');
   if(!confirm(`确定取消发布任务 ${r.version}？已完成的工作负载不会自动回滚。`))return;
   bumpReleaseExecutionToken(r);
   if(!transitionReleaseStatus(r,'cancelled',{reason:'ReleaseCancelled',type:'Warning',message:'用户取消发布任务；已完成的工作负载保留当前状态，未执行目标停止处理'}))return;
@@ -3251,14 +3318,21 @@ function upsertTargetDeploymentWorkload(deployment){
   const primaryId=componentWorkloadIds(component)[0],source=WORKLOADS[primaryId];
   const existing=WORKLOADS[deployment.workloadId];
   const workload=existing||JSON.parse(JSON.stringify(source||{}));
-  const online=target.status==='online'&&deployment.status!=='degraded';
-  const version=String(deployment.observedVersion||deployment.desiredVersion||app.version||'v1.0.0');
+  const nodeOnline=target.status==='online';
+  const desiredVersion=String(deployment.desiredVersion||app.version||'v1.0.0');
+  const observedVersion=String(deployment.observedVersion||imageVersionTag(workload.image)||desiredVersion);
+  const reconciled=window.CloudForgeReleaseDomain?.reconcileVersionState?window.CloudForgeReleaseDomain.reconcileVersionState({desiredVersion,observedVersion,ready:deployment.ready??workload.ready,replicas:deployment.replicas??workload.replicas,nodeOnline}):{status:!nodeOnline?'degraded':desiredVersion.replace(/^v/,'')===observedVersion.replace(/^v/,'')?'consistent':'drift',reconciledAt:new Date().toISOString()};
+  const online=nodeOnline&&reconciled.status==='consistent';
   workload.name=workload.name||`${component.name}-${target.id}`;
   workload.type=workload.type||(component.type==='database'?'StatefulSet':'Deployment');
   workload.replicas=Math.max(1,Number(workload.replicas)||1);
   workload.ready=online?workload.replicas:0;
   workload.health=online?'healthy':'degraded';
-  workload.image=String(workload.image||`registry.acme.io/${component.name}:v1.0.0`).replace(/:[^/:]+$/,'')+':'+version;
+  workload.image=String(workload.image||`registry.acme.io/${component.name}:v1.0.0`).replace(/:[^/:]+$/,'')+':'+observedVersion;
+  workload.desiredVersion=desiredVersion;
+  workload.observedVersion=observedVersion;
+  workload.reconcileStatus=reconciled.status;
+  workload.reconciledAt=reconciled.reconciledAt;
   workload.strategy=workload.strategy||'RollingUpdate';
   workload.pods=online?mkPods(workloadDisplayName(deployment.workloadId,workload),workload.replicas):[];
   workload.events=workload.events||[];
@@ -3271,7 +3345,11 @@ function upsertTargetDeploymentWorkload(deployment){
   workload.updatedAt=deployment.updatedAt||new Date().toLocaleString();
   WORKLOADS[deployment.workloadId]=workload;
   deployment.status=online?'healthy':'degraded';
-  deployment.observedVersion=version;
+  deployment.observedVersion=observedVersion;
+  deployment.reconcileStatus=reconciled.status;
+  deployment.reconciledAt=reconciled.reconciledAt;
+  deployment.syncSequence=Number(deployment.syncSequence)||0;
+  deployment.lastReportedAt=deployment.lastReportedAt||null;
   return workload;
 }
 function ensureTargetDeploymentWorkloads(){if(!isCapabilityEnabled('cloud-edge'))return;TARGET_DEPLOYMENTS.forEach(d=>{defineTargetDeploymentAliases(d);upsertTargetDeploymentWorkload(d);});}
@@ -3281,12 +3359,27 @@ APPS.forEach(app=>(app.components||[]).forEach(component=>createComponentVersion
 function edgeTargetLabel(t){if(t.kind==='cloud')return '云端集群';if(t.kind==='edge')return edgeNodeName(t.id);const g=EDGE_TARGET_GROUPS.find(x=>x.id===t.id);return g?g.name:t.name||t.id;}
 function edgeCreateTargetGroup(){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const name=document.getElementById('edge-target-name')?.value.trim(),kind=document.getElementById('edge-target-kind')?.value,region=document.getElementById('edge-target-region')?.value,policy=document.getElementById('edge-target-policy')?.value;if(!name)return alert('请填写目标名称。');let members=[],selector='';if(kind==='edge-group'){members=EDGE_NODES.filter(n=>region==='全部区域'||n.region===region).map(n=>n.id);selector='region='+region;}else{members=EDGE_DEVICES.filter(d=>d.type===region||region==='全部设备类型').map(d=>d.id);selector='type='+region;}EDGE_TARGET_GROUPS.unshift({id:'tg-'+Date.now().toString(36),name,kind,selector,members,strategy:policy,batchSize:1});persistEdgeState();edgeActiveTab='targets';render();}
 const EDGE_RELEASE_STATES=Object.freeze({
-  waiting:['等待目标在线','amber'],pending:['待确认','gray'],deploying:['执行中','blue'],paused:['已暂停','red'],
-  success:['已完成','green'],cancelled:['已取消','gray'],rolledback:['已回滚','gray']
+  waiting:['等待目标在线','amber'],pending:['待确认','gray'],deploying:['执行中','blue'],validating:['校验中','blue'],paused:['已暂停','red'],
+  rolling_back:['回滚中','blue'],rolled_back:['已回滚','gray'],partially_rolled_back:['部分回滚','amber'],
+  success:['已完成','green'],cancelled:['已取消','gray'],failed:['失败','red']
 });
-function edgeReleaseStateKey(r){const legacy={待确认:'pending',等待目标在线:'waiting',执行中:'deploying',已暂停:'paused',已完成:'success',已取消:'cancelled',已回滚:'rolledback'};return r?.statusKey||legacy[r?.status]||'pending';}
-function edgeReleaseStateMeta(r){const state=edgeReleaseStateKey(r),meta=EDGE_RELEASE_STATES[state]||[r?.status||'未知','gray'];return {key:state,label:meta[0],color:meta[1]};}
-function setEdgeReleaseState(r,key){const meta=EDGE_RELEASE_STATES[key]||[key,'gray'];r.statusKey=key;r.status=meta[0];return meta;}
+function edgeReleaseStateKey(r){const legacy={待确认:'pending',等待目标在线:'waiting',执行中:'deploying',校验中:'validating',已暂停:'paused',回滚中:'rolling_back',已完成:'success',已取消:'cancelled',已回滚:'rolled_back',部分回滚:'partially_rolled_back',失败:'failed',rolledback:'rolled_back'};const key=r?.statusKey||legacy[r?.status]||'pending';return key==='rolledback'?'rolled_back':key;}
+function edgeReleaseStateMeta(r){const state=edgeReleaseStateKey(r),meta=EDGE_RELEASE_STATES[state]||[r?.status||'未知','gray'];const uiKey=['rolled_back','partially_rolled_back'].includes(state)?'cancelled':state;return {key:uiKey,state,label:meta[0],color:meta[1]};}
+function setEdgeReleaseState(r,key,options={}){
+  const from=edgeReleaseStateKey(r),domain=window.CloudForgeReleaseDomain;
+  if(r?.statusKey&&domain?.canEdgeTransition&&!domain.canEdgeTransition(from,key)){
+    createReleaseAudit(r,options.action||`edge:${key}`,from,key,{reason:options.reason||'边缘发布状态转换被拒绝',result:'denied'});
+    return null;
+  }
+  const meta=EDGE_RELEASE_STATES[key]||[key,'gray'];
+  r.statusKey=key;r.status=meta[0];
+  if(from!==key){
+    r.transitionHistory=r.transitionHistory||[];
+    r.transitionHistory.unshift({from,to:key,time:new Date().toLocaleString(),reason:options.reason||'边缘发布状态迁移'});
+    createReleaseAudit(r,options.action||`edge:${key}`,from,key,{reason:options.reason||'边缘发布状态迁移',result:options.result||'accepted',health:options.health});
+  }
+  return meta;
+}
 function edgeReleaseAppChanged(){
   const app=getApp(document.getElementById('edge-release-app')?.value),select=document.getElementById('edge-release-component');
   if(!select)return;
@@ -3319,7 +3412,7 @@ function edgeCreateCoRelease(){
   const targetId=document.getElementById('edge-release-target')?.value,strategy=document.getElementById('edge-release-strategy')?.value;
   const offline=document.getElementById('edge-release-offline')?.value,app=getApp(appId),component=app?.components.find(c=>c.id===componentId);
   if(!app||!component)return alert('请选择有效的应用和组件。');
-  const active=EDGE_RELEASES.find(r=>r.appId===appId&&r.componentId===componentId&&!['success','cancelled','rolledback'].includes(edgeReleaseStateKey(r)));
+  const active=EDGE_RELEASES.find(r=>r.appId===appId&&r.componentId===componentId&&!['success','cancelled','rolled_back','partially_rolled_back'].includes(edgeReleaseStateKey(r)));
   if(active)return alert(`该组件已有活动协同发布任务「${active.version}」，请先完成、取消或回滚后再创建。`);
   if(!/^v?\d+\.\d+\.\d+([-.][a-zA-Z0-9.-]+)?$/.test(version))return alert('版本号格式不正确，例如 v1.2.3');
   if(!targetId)return alert('请选择部署目标。');
@@ -3327,13 +3420,94 @@ function edgeCreateCoRelease(){
   const snapshot=edgeReleaseSnapshot(target);if(!snapshot.length)return alert('当前目标没有有效成员，请先检查部署目标组。');
   const targetIds=new Set(snapshot.map(t=>t.id));
   const previous=TARGET_DEPLOYMENTS.find(d=>d.appId===appId&&d.componentId===componentId&&targetIds.has(d.targetId));
+  const previousDeployments=TARGET_DEPLOYMENTS.filter(d=>d.appId===appId&&d.componentId===componentId&&targetIds.has(d.targetId)).map(d=>({id:d.id,targetKind:d.targetKind,targetId:d.targetId,desiredVersion:d.desiredVersion,observedVersion:d.observedVersion,configVersion:d.configVersion,status:d.status,handled:false}));
   const id='cr-'+Date.now().toString(36),waiting=snapshot.some(t=>t.kind==='edge'&&t.status!=='online');
-  const release={id,appId,componentId,app:app.name,component:component.name,version,previousVersion:previous?.observedVersion||app.version||'未知',target,targetSnapshot:snapshot.map(t=>({...t})),strategy,offline,createdAt:new Date().toLocaleString(),currentBatch:0,attempts:0,history:[{time:new Date().toLocaleString(),event:`基于应用 ${app.id} / 组件 ${component.id} 创建任务并固定目标快照`}],steps:[{name:'校验目标与容量',status:'待执行'},{name:'分发镜像与配置',status:'待执行'},{name:'分批更新工作负载',status:'待执行'},{name:'健康门禁与版本对账',status:'待执行'}]};
+  const release={id,appId,componentId,app:app.name,component:component.name,version,desiredVersion:version,baselineVersion:previous?.observedVersion||app.version||'未知',previousVersion:previous?.observedVersion||app.version||'未知',previousDeployments,target,targetSnapshot:snapshot.map(t=>({...t})),strategy,offline,createdAt:new Date().toLocaleString(),currentBatch:0,attempts:0,audit:[],history:[{time:new Date().toLocaleString(),event:`基于应用 ${app.id} / 组件 ${component.id} 创建任务并固定目标快照`}],steps:[{name:'校验目标与容量',status:'待执行'},{name:'分发镜像与配置',status:'待执行'},{name:'分批更新工作负载',status:'待执行'},{name:'健康门禁与版本对账',status:'待执行'}]};
   setEdgeReleaseState(release,waiting?'waiting':'pending');
   EDGE_RELEASES.unshift(release);persistEdgeState();edgeActiveTab='rollout';render();
 }
 function edgeReleaseTargetsOnline(r){return (r.targetSnapshot||edgeReleaseSnapshot(r.target)).filter(t=>t.kind==='edge').every(t=>EDGE_NODES.find(n=>n.id===t.id)?.status==='online');}
 function edgeReleaseLog(r,event){r.history=r.history||[];r.history.unshift({time:new Date().toLocaleString(),event});persistEdgeState();}
+function edgeRestorePreviousDeployments(r,reason){
+  const targetIds=new Set((r.targetSnapshot||[]).map(item=>item.id));
+  const current=TARGET_DEPLOYMENTS.filter(item=>item.appId===r.appId&&item.componentId===r.componentId&&targetIds.has(item.targetId));
+  let restored=0,partial=0;
+  current.forEach(deployment=>{
+    const previous=(r.previousDeployments||[]).find(item=>item.id===deployment.id);
+    const version=previous?.observedVersion||r.previousVersion||deployment.observedVersion;
+    const nodeOnline=deployment.targetKind==='cloud'||EDGE_NODES.find(node=>node.id===deployment.targetId)?.status==='online';
+    deployment.desiredVersion=version;
+    deployment.observedVersion=nodeOnline?version:deployment.observedVersion;
+    deployment.configVersion=Number(previous?.configVersion)||Number(deployment.configVersion)||1;
+    deployment.reconcileStatus=nodeOnline?'consistent':'degraded';
+    deployment.reconciledAt=new Date().toISOString();
+    deployment.status=nodeOnline?'healthy':'degraded';
+    deployment.syncSequence=(Number(deployment.syncSequence)||0)+(nodeOnline?1:0);
+    deployment.lastReportedAt=nodeOnline?deployment.reconciledAt:deployment.lastReportedAt||null;
+    deployment.updatedAt=new Date().toLocaleString();
+    if(nodeOnline)restored+=1;else partial+=1;
+    upsertTargetDeploymentWorkload(deployment);
+  });
+  const missing=(r.targetSnapshot||[]).filter(target=>!current.some(item=>item.targetId===target.id));
+  (r.targetSnapshot||[]).forEach(target=>{
+    const deployment=current.find(item=>item.targetId===target.id);
+    target.status=deployment?.status||target.status;
+    target.version=deployment?.observedVersion||r.previousVersion;
+  });
+  createReleaseAudit(r,'edge-target-restore',edgeReleaseStateKey(r),edgeReleaseStateKey(r),{reason,result:partial||missing.length?'partial':'restored',baselineVersion:r.baselineVersion});
+  return {restored,partial:partial+missing.length,total:Math.max(current.length,missing.length)};
+}
+function reconcileEdgeNodeState(id,options={}){
+  const node=EDGE_NODES.find(item=>item.id===id);
+  if(!node)return {ok:false,message:'节点不存在',items:[]};
+  const deployments=TARGET_DEPLOYMENTS.filter(item=>item.targetId===id);
+  const now=options.now||new Date().toISOString();
+  if(node.status!=='online'){
+    deployments.forEach(deployment=>{
+      deployment.reconcileStatus='degraded';
+      deployment.reconciledAt=now;
+      deployment.status='degraded';
+      upsertTargetDeploymentWorkload(deployment);
+    });
+    node.syncSequence=Number(node.syncSequence)||0;
+    node.lastReportedAt=node.lastReportedAt||null;
+    return {ok:false,message:'节点离线，期望状态已保留',items:deployments};
+  }
+  const items=[];
+  deployments.forEach(deployment=>{
+    const component=targetDeploymentComponent(deployment);
+    const primaryId=component?componentWorkloadIds(component)[0]:null;
+    const primaryWorkload=primaryId?WORKLOADS[primaryId]:null;
+    const replicas=Math.max(1,Number(primaryWorkload?.replicas)||1);
+    const desiredState={
+      desiredVersion:deployment.desiredVersion||node.desiredVersion||component?.version||'v1.0.0',
+      configVersion:Number(deployment.configVersion)||1,
+      ready:replicas,
+      replicas
+    };
+    const reconciled=window.CloudForgeReleaseDomain?.reconcileEdgeDeployment
+      ?window.CloudForgeReleaseDomain.reconcileEdgeDeployment({deployment,node,desiredState,now})
+      :{deployment:{...deployment,observedVersion:desiredState.desiredVersion,reconcileStatus:'consistent',syncSequence:(Number(deployment.syncSequence)||0)+1,lastReportedAt:now}};
+    Object.assign(deployment,reconciled.deployment);
+    deployment.status=deployment.reconcileStatus==='consistent'?'healthy':'degraded';
+    deployment.updatedAt=new Date().toLocaleString();
+    upsertTargetDeploymentWorkload(deployment);
+    items.push(deployment);
+  });
+  node.syncSequence=(Number(node.syncSequence)||0)+1;
+  node.lastReportedAt=now;
+  node.lastSync='刚刚';
+  node.mode='在线同步';
+  node.desiredState=deployments.map(item=>({deploymentId:item.id,version:item.desiredVersion,configVersion:item.configVersion}));
+  node.observedState=deployments.map(item=>({deploymentId:item.id,version:item.observedVersion,reconcileStatus:item.reconcileStatus}));
+  node.audit=node.audit||[];
+  node.audit.unshift(window.CloudForgeReleaseDomain?.createAuditEvent?window.CloudForgeReleaseDomain.createAuditEvent({releaseId:null,action:'edge-reconcile',from:options.from||'offline',to:'online',actor:options.actor||'边缘 Agent',reason:options.reason||'节点重连自动对账',health:{deployments:items.length,consistent:items.filter(item=>item.reconcileStatus==='consistent').length},result:items.every(item=>item.reconcileStatus==='consistent')?'consistent':'partial',baselineVersion:null}):{id:`audit-${Date.now().toString(36)}`,time:now,action:'edge-reconcile',from:options.from||'offline',to:'online',reason:options.reason||'节点重连自动对账',result:'recorded'});
+  EDGE_RELEASES.filter(release=>edgeReleaseStateKey(release)==='waiting'&&edgeReleaseTargetsOnline(release)).forEach(release=>{
+    setEdgeReleaseState(release,'deploying',{reason:'ReconnectReconciliationReady',action:'edge:reconnect',health:{nodeId:id}});
+    edgeReleaseLog(release,`节点 ${node.name} 已重连并完成对账，任务恢复推进`);
+  });
+  return {ok:items.every(item=>item.reconcileStatus==='consistent'),message:`已对账 ${items.length} 个目标部署`,items,node};
+}
 function edgeCompleteReleaseTargets(r){
   const now=new Date().toLocaleString();
   (r.targetSnapshot||[]).filter(t=>t.kind==='edge'||t.kind==='cloud').forEach(t=>{
@@ -3346,7 +3520,7 @@ function edgeCompleteReleaseTargets(r){
       defineTargetDeploymentAliases(deployment);
       TARGET_DEPLOYMENTS.unshift(deployment);
     }
-    deployment.desiredVersion=r.version;deployment.observedVersion=r.version;deployment.releaseId=r.id;deployment.updatedAt=now;
+    deployment.desiredVersion=r.version;deployment.observedVersion=r.version;deployment.reconcileStatus='consistent';deployment.reconciledAt=new Date().toISOString();deployment.releaseId=r.id;deployment.updatedAt=now;
     deployment.configVersion=Number(component.appliedConfigVersion||component.configVersion)||1;
     deployment.status=t.kind==='cloud'?'healthy':(EDGE_NODES.find(n=>n.id===t.id)?.status==='online'?'healthy':'degraded');
     t.deploymentId=deployment.id;
@@ -3357,20 +3531,51 @@ function edgeCompleteReleaseTargets(r){
 function edgeAdvanceRelease(id){
   if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
   const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);
-  if(!r||['success','cancelled','rolledback'].includes(state))return;
+  if(!r||['success','cancelled','rolled_back','partially_rolled_back'].includes(state))return;
   if(!edgeReleaseTargetsOnline(r)){setEdgeReleaseState(r,'waiting');edgeReleaseLog(r,'检测到目标离线，暂停推进并等待恢复');render();return;}
   if(state==='paused'){alert('任务已暂停，请先执行重试或回滚。');return;}
   const step=r.steps.find(x=>x.status==='待执行');if(!step){setEdgeReleaseState(r,'success');edgeCompleteReleaseTargets(r);edgeReleaseLog(r,'发布成功，目标部署与工作负载版本已对账');render();return;}
   if(step.name==='分批更新工作负载'){
     const targets=(r.targetSnapshot||[]).filter(t=>t.kind==='edge');const batchSize=/灰度/.test(r.strategy)?1:Math.max(1,Math.ceil(targets.length/2));
     const totalBatches=Math.max(1,Math.ceil(targets.length/batchSize));r.currentBatch=Math.min(totalBatches,(r.currentBatch||0)+1);
+    const batchTargets=targets.slice((r.currentBatch-1)*batchSize,r.currentBatch*batchSize);
+    batchTargets.forEach(t=>{
+      const app=targetDeploymentApp({appId:r.appId}),component=app?.components.find(c=>c.id===r.componentId),node=EDGE_NODES.find(n=>n.id===t.id);
+      if(!app||!component||!node||node.status!=='online')return;
+      let deployment=TARGET_DEPLOYMENTS.find(d=>d.appId===r.appId&&d.componentId===r.componentId&&d.targetId===t.id);
+      if(!deployment){
+        const primaryId=componentWorkloadIds(component)[0];
+        deployment={id:`td-${Date.now().toString(36)}-${TARGET_DEPLOYMENTS.length+1}`,appId:r.appId,componentId:r.componentId,targetKind:'edge',targetId:t.id,workloadId:`wl-${r.appId}-${r.componentId}-${t.id}-${Date.now().toString(36)}`,desiredVersion:r.version,observedVersion:r.version,configVersion:Number(component.appliedConfigVersion||component.configVersion)||1,status:'healthy',policy:r.strategy,updatedAt:new Date().toLocaleString()};
+        if(!deployment.workloadId)deployment.workloadId=primaryId;
+        defineTargetDeploymentAliases(deployment);
+        TARGET_DEPLOYMENTS.unshift(deployment);
+      }
+      deployment.desiredVersion=r.version;
+      deployment.observedVersion=r.version;
+      deployment.reconcileStatus='consistent';
+      deployment.reconciledAt=new Date().toISOString();
+      deployment.syncSequence=(Number(deployment.syncSequence)||0)+1;
+      deployment.lastReportedAt=deployment.reconciledAt;
+      deployment.status='healthy';
+      deployment.updatedAt=new Date().toLocaleString();
+      t.deploymentId=deployment.id;
+      upsertTargetDeploymentWorkload(deployment);
+    });
     step.status=r.currentBatch>=totalBatches?'已完成':'进行中';edgeReleaseLog(r,`完成第 ${r.currentBatch}/${totalBatches} 批更新`);
     if(step.status==='进行中'){setEdgeReleaseState(r,'deploying');render();return;}
   }else if(step.name==='健康门禁与版本对账'){
     const degraded=(r.targetSnapshot||[]).some(t=>{
       if(t.kind!=='edge')return false;
       const deployment=TARGET_DEPLOYMENTS.find(d=>d.appId===r.appId&&d.componentId===r.componentId&&d.targetId===t.id);
-      return deployment?.status==='degraded';
+      if(!deployment)return true;
+      const reconciled=window.CloudForgeReleaseDomain?.reconcileVersionState?.({
+        desiredVersion:deployment.desiredVersion||r.version,
+        observedVersion:deployment.observedVersion,
+        ready:targetDeploymentWorkload(deployment)?.ready,
+        replicas:targetDeploymentWorkload(deployment)?.replicas,
+        nodeOnline:EDGE_NODES.find(n=>n.id===t.id)?.status==='online'
+      });
+      return (reconciled?.status||deployment.reconcileStatus||'missing')!=='consistent';
     });
     if(degraded){step.status='门禁失败';setEdgeReleaseState(r,'paused');r.failureReason='健康门禁未通过：目标节点存在降级工作负载';edgeReleaseLog(r,r.failureReason);render();return;}
     step.status='已完成';edgeReleaseLog(r,'健康门禁通过，目标版本对账完成');
@@ -3380,13 +3585,66 @@ function edgeAdvanceRelease(id){
   else setEdgeReleaseState(r,'deploying');
   render();
 }
-function edgeSimulateReleaseFailure(id){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);if(!r||['success','cancelled','rolledback'].includes(state))return;setEdgeReleaseState(r,'paused');r.failureReason='模拟发布健康检查失败';const step=r.steps.find(x=>x.status==='待执行'||x.status==='进行中');if(step)step.status='门禁失败';edgeReleaseLog(r,'注入模拟故障：健康门禁失败，已暂停后续批次');render();}
-function edgeRetryRelease(id){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);if(!r||!['paused','waiting'].includes(state))return;if(!edgeReleaseTargetsOnline(r)){setEdgeReleaseState(r,'waiting');alert('仍有目标离线，恢复节点后才能重试。');render();return;}const failed=r.steps.find(x=>x.status==='门禁失败'||x.status==='进行中');if(failed)failed.status='待执行';r.failureReason='';setEdgeReleaseState(r,'deploying');edgeReleaseLog(r,'人工确认重试，失败步骤已重新排队');render();}
-function edgeRollbackRelease(id){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);if(!r||['success','cancelled','rolledback'].includes(state))return;if(!confirm('确认将该模拟发布任务标记为回滚？此操作只更新原型状态，不会触碰真实环境。'))return;setEdgeReleaseState(r,'rolledback');r.steps.forEach(st=>{if(st.status!=='待执行')st.status='已回滚';});edgeReleaseLog(r,'执行回滚流程（模拟），目标版本恢复为 '+(r.previousVersion||'未知'));render();}
-function edgeCancelRelease(id){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);if(!r||['success','rolledback','cancelled'].includes(state))return;setEdgeReleaseState(r,'cancelled');edgeReleaseLog(r,'任务已取消');render();}
+function edgeSimulateReleaseFailure(id){
+  if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
+  const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);
+  if(!r||['success','cancelled','rolled_back','partially_rolled_back'].includes(state))return;
+  if(!setEdgeReleaseState(r,'paused',{reason:'模拟健康门禁失败',action:'edge:health-gate',health:{result:'failed'}}))return;
+  r.failureReason='模拟发布健康检查失败';
+  const step=r.steps.find(x=>x.status==='待执行'||x.status==='进行中');if(step)step.status='门禁失败';
+  edgeReleaseLog(r,'注入模拟故障：健康门禁失败，已暂停后续批次');render();
+}
+function edgeRetryRelease(id){
+  if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
+  const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);
+  if(!r||!['paused','waiting','failed'].includes(state))return;
+  if(!edgeReleaseTargetsOnline(r)){setEdgeReleaseState(r,'waiting',{reason:'目标离线，等待自动对账'});alert('仍有目标离线，恢复节点后才能重试。');render();return;}
+  const failed=r.steps.find(x=>x.status==='门禁失败'||x.status==='进行中');if(failed)failed.status='待执行';
+  r.failureReason='';
+  if(!setEdgeReleaseState(r,'deploying',{reason:'人工确认重试'}))return;
+  edgeReleaseLog(r,'人工确认重试，失败步骤已重新排队');render();
+}
+function edgeRollbackRelease(id){
+  if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
+  const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);
+  if(!r||['cancelled','rolled_back','partially_rolled_back'].includes(state))return;
+  if(!confirm('确认回滚该协同发布任务？云端期望版本和已更新目标将恢复到发布前基线。'))return;
+  if(!setEdgeReleaseState(r,'rolling_back',{reason:'用户发起协同发布回滚',action:'edge:rollback',health:{targets:r.targetSnapshot?.length||0}}))return;
+  const result=edgeRestorePreviousDeployments(r,'用户回滚协同发布');
+  const finalState=result.partial?'partially_rolled_back':'rolled_back';
+  setEdgeReleaseState(r,finalState,{reason:result.partial?'部分目标离线，回滚未完全收敛':'全部目标恢复到发布前基线',action:'edge:rollback',result:result.partial?'partial':'rolled_back'});
+  r.rollbackReason='用户回滚协同发布';r.rollbackTime=new Date().toLocaleString();
+  r.steps.forEach(step=>{if(step.status!=='待执行')step.status='已回滚';});
+  edgeReleaseLog(r,`回滚${result.partial?'部分完成':'完成'}：恢复 ${result.restored} 个目标到 ${r.previousVersion||'发布前版本'}，${result.partial} 个目标等待重连对账`);render();
+}
+function edgeCancelRelease(id){
+  if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
+  const r=EDGE_RELEASES.find(x=>x.id===id),state=edgeReleaseStateKey(r);
+  if(!r||['success','cancelled','rolled_back','partially_rolled_back'].includes(state))return;
+  const restored=edgeRestorePreviousDeployments(r,'用户取消协同发布');
+  if(!setEdgeReleaseState(r,'cancelled',{reason:'用户取消协同发布',action:'edge:cancel',health:{restored:restored.restored,pending:restored.partial}}))return;
+  r.cancelReason='用户取消协同发布';r.cancelTime=new Date().toLocaleString();
+  edgeReleaseLog(r,`任务已取消，${restored.restored} 个目标恢复发布前版本${restored.partial?`，${restored.partial} 个目标等待重连对账`:''}`);render();
+}
 
 function edgeNodeName(id){return EDGE_NODES.find(n=>n.id===id)?.name||'未知节点';}
 function edgeStatusBadge(status){return status==='online'?'<span class="badge green">在线</span>':status==='offline'?'<span class="badge red">离线</span>':status==='healthy'?'<span class="badge green">健康</span>':'<span class="badge amber">待处理</span>';}
+function decorateCloudEdgeClosure(){
+  const mount=document.querySelector('#main .edge-console');if(!mount)return;
+  const deployments=[...(window.TARGET_DEPLOYMENTS||[])];
+  const consistent=deployments.filter(item=>(item.reconcileStatus||(item.desiredVersion===item.observedVersion?'consistent':'drift'))==='consistent').length;
+  const drift=deployments.filter(item=>['drift','missing'].includes(item.reconcileStatus||(item.desiredVersion===item.observedVersion?'consistent':'drift'))).length;
+  const degraded=deployments.filter(item=>(item.reconcileStatus||'')==='degraded').length;
+  const activeReleases=(window.EDGE_RELEASES||[]).filter(item=>!['success','cancelled','rolled_back','partially_rolled_back'].includes(edgeReleaseStateKey(item))).length;
+  const auditCount=(window.EDGE_RELEASES||[]).reduce((sum,item)=>sum+(Array.isArray(item.audit)?item.audit.length:0),0)+(window.EDGE_NODES||[]).reduce((sum,item)=>sum+(Array.isArray(item.audit)?item.audit.length:0),0);
+  const offline=(window.EDGE_NODES||[]).filter(item=>item.status==='offline').length;
+  const lastReconciled=deployments.map(item=>item.reconciledAt).filter(Boolean).sort().pop();
+  const strip=document.createElement('section');
+  strip.className='edge-closure-strip';
+  strip.innerHTML=`<div class="edge-closure-metric"><span>版本对账</span><b>${consistent}/${deployments.length}</b><small>${drift?`${drift} 个漂移/缺失`:degraded?`${degraded} 个离线或降级`:'期望版本与运行版本一致'}</small></div><div class="edge-closure-metric"><span>活动发布</span><b>${activeReleases}</b><small>等待目标、执行、暂停和回滚均纳入同一状态机</small></div><div class="edge-closure-metric"><span>边缘自治</span><b>${offline}</b><small>离线节点保留云端期望态与最后一次实际态</small></div><div class="edge-closure-metric"><span>结构化审计</span><b>${auditCount}</b><small>${lastReconciled?'最近对账 '+escapeHtml(new Date(lastReconciled).toLocaleString()):'尚无对账记录'}</small></div>`;
+  const tabs=mount.querySelector('.edge-tabs');
+  if(tabs)tabs.parentNode.insertBefore(strip,tabs);else mount.prepend(strip);
+}
 function viewCloudEdge(){
   if(!isCapabilityEnabled('cloud-edge'))return viewCapabilities();
   const online=EDGE_NODES.filter(n=>n.status==='online').length;
@@ -3418,11 +3676,27 @@ function viewCloudEdge(){
   } else {
     body=`<div class="grid-2"><div class="card"><div class="card-head"><div><h3>同步策略</h3><div class="sub">控制面期望状态与边缘实际状态</div></div></div><div style="padding:16px"><div class="form-group"><label>同步模式</label><select id="edge-sync-mode" class="form-control"><option>双向状态同步</option><option>云端下发、边缘上报</option><option>定时批量同步</option></select></div><div class="form-group"><label>断网策略</label><select id="edge-offline-policy" class="form-control"><option>保持最后一次有效配置并本地自治</option><option>停止非关键新任务，保留现有任务</option><option>仅允许白名单任务继续运行</option></select></div><div class="form-group"><label>重连后同步</label><select id="edge-reconnect-policy" class="form-control"><option>先对账，再增量同步</option><option>仅同步云端期望状态</option><option>人工确认后同步</option></select></div><button class="btn primary" onclick="edgeSaveSyncPolicy()">保存策略</button></div></div><div class="card"><div class="card-head"><div><h3>节点同步状态</h3><div class="sub">模拟重连、对账与状态回传</div></div></div><div class="table-wrap"><table><thead><tr><th>节点</th><th>连接状态</th><th>最近同步</th><th>动作</th></tr></thead><tbody>${EDGE_NODES.map(n=>`<tr><td>${escapeHtml(n.name)}</td><td>${edgeStatusBadge(n.status)}</td><td>${escapeHtml(n.lastSync)}</td><td><button class="btn sm" ${n.status==='offline'?'disabled':''} onclick="edgeSyncNode('${n.id}')">立即对账</button></td></tr>`).join('')}</tbody></table></div></div></div><div class="notice" style="margin-top:12px">离线自治不等于无限期忽略策略：应设置配置有效期、证书轮换边界、缓存容量和重连冲突处理规则。当前保存和同步操作只更新本地演示状态。</div>`;
   }
-  const pending=EDGE_RELEASES.filter(r=>!['success','cancelled','rolledback'].includes(edgeReleaseStateKey(r))).length;
+  const pending=EDGE_RELEASES.filter(r=>!['success','cancelled','rolled_back','partially_rolled_back'].includes(edgeReleaseStateKey(r))).length;
   return `<div class="edge-console"><section class="edge-hero"><div class="edge-hero-main"><div class="edge-hero-icon">☁</div><div><div class="breadcrumb">平台 / 运行基础设施 / 云边端协同</div><h1>云边端协同</h1><p>统一管理云端控制面、分布式边缘节点与端侧设备，让部署、同步和故障处理在一个工作台完成。</p><div class="edge-hero-tags"><span class="badge blue">统一编排</span><span class="badge mesh">边缘自治</span><span class="badge gray">状态对账</span></div></div></div><div class="edge-hero-side"><div class="edge-hero-kpi"><span>边缘节点在线</span><strong>${online}<small style="font-size:12px;color:#7b8498;font-weight:500"> / ${EDGE_NODES.length}</small></strong></div><div class="edge-hero-kpi"><span>健康部署</span><strong>${running}</strong></div><div class="edge-hero-kpi"><span>端侧设备</span><strong>${EDGE_DEVICES.length}</strong></div><div class="edge-hero-kpi"><span>待处理发布</span><strong style="${pending?'color:#b7791f':''}">${pending}</strong></div></div></section><div class="edge-tabs">${tabs.map(t=>`<button class="tab ${edgeActiveTab===t[0]?'active':''}" onclick="edgeActiveTab='${t[0]}';render()">${t[1]}</button>`).join('')}</div>${body}<div class="muted" style="font-size:12px;margin-top:14px;padding:0 3px">原型说明：节点、设备、部署及同步结果均为模拟数据，不会连接或修改真实集群。</div></div>`;
 }
 function edgeFocusNode(id){const n=EDGE_NODES.find(x=>x.id===id);if(!n)return;edgeSelectedNodeId=id;const deployments=EDGE_DEPLOYMENTS.filter(d=>d.target===id),devices=EDGE_DEVICES.filter(d=>d.node===id),releases=EDGE_RELEASES.filter(r=>r.target?.kind==='edge'&&r.target.id===id||r.target?.kind==='edge-group'&&(EDGE_TARGET_GROUPS.find(g=>g.id===r.target.id)?.members||[]).includes(id));const cpu=Math.max(0,Math.min(100,n.cpu||0)),mem=Math.max(0,Math.min(100,n.memory||0));showModal(`<div class="modal-head"><div><h2>${escapeHtml(n.name)}</h2><div class="sub">节点协同工作台 · ${escapeHtml(n.id)} · ${escapeHtml(n.site)}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="edge-node-detail-status">${edgeStatusBadge(n.status)} <span class="muted">${escapeHtml(n.mode)} · Agent ${escapeHtml(n.version)}</span><span class="muted" style="margin-left:auto">最近同步：${escapeHtml(n.lastSync)}</span></div><div class="grid-4 edge-node-detail-kpis"><div class="stat-card"><div class="stat-label">工作负载</div><div class="stat-value">${deployments.length}</div><div class="stat-foot">${deployments.filter(d=>d.status==='healthy').length} 个健康</div></div><div class="stat-card"><div class="stat-label">端侧设备</div><div class="stat-value">${devices.length}</div><div class="stat-foot">${devices.filter(d=>d.status==='online').length} 个在线</div></div><div class="stat-card"><div class="stat-label">CPU 使用率</div><div class="stat-value">${cpu}%</div><div class="edge-detail-track"><i style="width:${cpu}%"></i></div></div><div class="stat-card"><div class="stat-label">内存使用率</div><div class="stat-value">${mem}%</div><div class="edge-detail-track"><i style="width:${mem}%"></i></div></div></div><div class="edge-detail-section"><div class="edge-detail-section-head"><h3>关联工作负载</h3><button class="btn sm" onclick="edgeOpenNodeSection('${n.id}','deployments')">查看全部 →</button></div>${deployments.length?`<div class="edge-related-list">${deployments.map(d=>`<div class="edge-related-row"><div><b>${escapeHtml(d.app)}</b><div class="muted">${escapeHtml(d.component)} · v${escapeHtml(d.version)}</div></div><span class="badge ${d.status==='healthy'?'green':'amber'}">${d.status==='healthy'?'健康':'需关注'}</span></div>`).join('')}</div>`:'<div class="empty-state">该节点暂无关联工作负载</div>'}</div><div class="edge-detail-section"><div class="edge-detail-section-head"><h3>端侧设备</h3><button class="btn sm" onclick="edgeOpenNodeSection('${n.id}','devices')">查看全部 →</button></div>${devices.length?`<div class="edge-related-list">${devices.map(d=>`<div class="edge-related-row"><div><b>${escapeHtml(d.name)}</b><div class="muted">${escapeHtml(d.type)} · ${escapeHtml(d.protocol)}</div></div>${edgeStatusBadge(d.status)}</div>`).join('')}</div>`:'<div class="empty-state">该节点暂无纳管设备</div>'}</div><div class="edge-detail-section"><div class="edge-detail-section-head"><h3>关联协同发布</h3><button class="btn sm" onclick="edgeOpenNodeSection('${n.id}','rollout')">发布工作台 →</button></div>${releases.length?`<div class="edge-related-list">${releases.slice(0,3).map(r=>`<div class="edge-related-row"><div><b>${escapeHtml(r.app)} · ${escapeHtml(r.version)}</b><div class="muted">${escapeHtml(r.createdAt||'')}</div></div><span class="badge gray">${escapeHtml(r.status)}</span></div>`).join('')}</div>`:'<div class="muted" style="font-size:12px">暂无关联发布任务</div>'}</div>${n.status==='offline'?'<div class="notice" style="margin-top:12px">节点当前离线：云端资源与设备状态可能滞后。边缘本地自治仍可持续运行；重连后应先对账，再执行增量同步。</div>':''}<div class="modal-actions"><button class="btn" onclick="edgeOpenNodeSection('${n.id}','sync')">同步与自治</button><button class="btn" onclick="closeModal()">关闭</button><button class="btn primary" onclick="closeModal();edgeToggleNode('${n.id}')">${n.status==='online'?'模拟断连':'模拟恢复连接'}</button></div>`);}
-function edgeToggleNode(id){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const n=EDGE_NODES.find(x=>x.id===id);if(!n)return;n.status=n.status==='online'?'offline':'online';n.mode=n.status==='online'?'在线同步':'断网自治';n.lastSync=n.status==='online'?'刚刚':n.lastSync;if(n.status==='online'){n.cpu=Math.max(15,n.cpu||32);n.memory=Math.max(25,n.memory||40);}else{n.cpu=0;n.memory=0;}TARGET_DEPLOYMENTS.filter(d=>d.targetId===id).forEach(d=>{d.status=n.status==='online'&&d.desiredVersion===d.observedVersion?'healthy':'degraded';d.updatedAt=new Date().toLocaleString();upsertTargetDeploymentWorkload(d);});persistEdgeState();persistDemoState();render();}
+function edgeToggleNode(id){
+  if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
+  const n=EDGE_NODES.find(x=>x.id===id);if(!n)return;
+  const wasOffline=n.status==='offline';
+  n.status=wasOffline?'online':'offline';
+  n.mode=n.status==='online'?'在线同步':'断网自治';
+  n.lastSync=n.status==='online'?'刚刚':n.lastSync;
+  if(n.status==='online'){n.cpu=Math.max(15,n.cpu||32);n.memory=Math.max(25,n.memory||40);}else{n.cpu=0;n.memory=0;}
+  TARGET_DEPLOYMENTS.filter(d=>d.targetId===id).forEach(d=>{
+    if(n.status==='offline'){d.reconcileStatus='degraded';d.reconciledAt=new Date().toISOString();}
+    d.status=n.status==='online'&&d.reconcileStatus==='consistent'?'healthy':'degraded';
+    d.updatedAt=new Date().toLocaleString();
+    upsertTargetDeploymentWorkload(d);
+  });
+  if(wasOffline)reconcileEdgeNodeState(id,{reason:'节点重连自动对账',from:'offline'});
+  persistEdgeState();persistDemoState();render();
+}
 function edgeAddNodeModal(){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');showModal(`<div class="modal-head"><div><h2>注册边缘节点</h2><div class="sub">创建节点纳管记录，不会真实安装 Agent</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="form-group"><label>节点名称</label><input id="edge-new-name" class="form-control" placeholder="例如：福冈工厂边缘节点"></div><div class="form-group"><label>站点 / 位置</label><input id="edge-new-site" class="form-control" placeholder="例如：福冈工厂 / 生产线 B"></div><div class="form-group"><label>区域</label><input id="edge-new-region" class="form-control" placeholder="例如：福冈"></div><div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="edgeCreateNode()">创建节点记录</button></div>`);}
 function edgeCreateNode(){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const name=document.getElementById('edge-new-name')?.value.trim(),site=document.getElementById('edge-new-site')?.value.trim(),region=document.getElementById('edge-new-region')?.value.trim();if(!name||!site){alert('请填写节点名称和站点位置。');return;}const id='edge-'+Date.now().toString(36);EDGE_NODES.unshift({id,name,site,region:region||'未指定',status:'offline',version:'未安装',cpu:0,memory:0,workloads:0,devices:0,lastSync:'从未同步',mode:'等待注册'});persistEdgeState();closeModal();edgeActiveTab='nodes';render();}
 function edgeDeployModal(){
@@ -3462,7 +3736,7 @@ function edgeCreateDeployment(){
 function deleteTargetDeployment(id){
   const deployment=TARGET_DEPLOYMENTS.find(d=>d.id===id);if(!deployment)return;
   const app=targetDeploymentApp(deployment),component=targetDeploymentComponent(deployment);
-  const active=EDGE_RELEASES.find(r=>r.appId===deployment.appId&&r.componentId===deployment.componentId&&!['success','cancelled','rolledback'].includes(edgeReleaseStateKey(r))&&(r.targetSnapshot||[]).some(t=>t.id===deployment.targetId));
+  const active=EDGE_RELEASES.find(r=>r.appId===deployment.appId&&r.componentId===deployment.componentId&&!['success','cancelled','rolled_back','partially_rolled_back'].includes(edgeReleaseStateKey(r))&&(r.targetSnapshot||[]).some(t=>t.id===deployment.targetId));
   if(active)return alert(`目标部署正被协同发布任务「${active.version}」使用，请先完成或取消任务。`);
   if(!confirm(`删除目标部署「${app?.name||deployment.appId} / ${component?.name||deployment.componentId} / ${targetDeploymentTargetName(deployment)}」？对应边缘工作负载也会移除，历史发布快照保留。`))return;
   if(WORKLOADS[deployment.workloadId]&&!componentWorkloadIds(component||{}).includes(deployment.workloadId))delete WORKLOADS[deployment.workloadId];
@@ -3471,7 +3745,14 @@ function deleteTargetDeployment(id){
 }
 function edgeDeviceModal(){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const opts=EDGE_NODES.map(n=>`<option value="${n.id}">${escapeHtml(n.name)}</option>`).join('');showModal(`<div class="modal-head"><div><h2>登记端侧设备</h2><div class="sub">登记身份和接入协议，不连接真实设备</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="form-group"><label>设备名称</label><input id="edge-device-name" class="form-control" placeholder="例如：振动传感器 VS-001"></div><div class="form-group"><label>设备类型</label><select id="edge-device-type" class="form-control"><option>传感器</option><option>工业摄像头</option><option>PLC 控制器</option><option>机器人</option><option>IoT 网关</option><option>其他设备</option></select></div><div class="form-group"><label>接入节点</label><select id="edge-device-node" class="form-control">${opts}</select></div><div class="form-group"><label>协议</label><select id="edge-device-protocol" class="form-control"><option>MQTT</option><option>OPC UA</option><option>Modbus TCP</option><option>RTSP</option><option>HTTP</option></select></div><div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="edgeCreateDevice()">登记设备</button></div>`);}
 function edgeCreateDevice(){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const name=document.getElementById('edge-device-name')?.value.trim(),type=document.getElementById('edge-device-type')?.value,node=document.getElementById('edge-device-node')?.value,protocol=document.getElementById('edge-device-protocol')?.value;if(!name||!node){alert('请填写设备名称并选择接入节点。');return;}const id=`dev-${Date.now().toString(36)}`;EDGE_DEVICES.unshift({id,name,type,node,protocol,status:'offline'});const n=EDGE_NODES.find(x=>x.id===node);if(n)n.devices++;persistEdgeState();closeModal();edgeActiveTab='devices';render();}
-function edgeSyncNode(id){if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');const n=EDGE_NODES.find(x=>x.id===id);if(!n||n.status!=='online')return alert('节点离线，无法执行云端同步。');n.lastSync='刚刚';n.mode='在线同步';TARGET_DEPLOYMENTS.filter(d=>d.targetId===id).forEach(d=>{d.observedVersion=d.desiredVersion;d.status='healthy';d.updatedAt=new Date().toLocaleString();upsertTargetDeploymentWorkload(d);});persistEdgeState();persistDemoState();showModal(`<div class="modal-head"><div><h2>对账完成（模拟）</h2><div class="sub">${escapeHtml(n.name)}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="validation-box">已将 ${TARGET_DEPLOYMENTS.filter(d=>d.targetId===id).length} 个目标部署的期望版本同步为实际版本；未连接真实节点。</div><div class="modal-actions"><button class="btn primary" onclick="closeModal();render()">完成</button></div>`);}
+function edgeSyncNode(id){
+  if(!isCapabilityEnabled('cloud-edge'))return alert('云边端协同能力未启用。');
+  const n=EDGE_NODES.find(x=>x.id===id);
+  if(!n||n.status!=='online')return alert('节点离线，无法执行云端同步。');
+  const result=reconcileEdgeNodeState(id,{reason:'人工触发版本对账',from:'online'});
+  persistEdgeState();persistDemoState();
+  showModal(`<div class="modal-head"><div><h2>对账完成（模拟）</h2><div class="sub">${escapeHtml(n.name)} · syncSequence ${Number(n.syncSequence)||0}</div></div><button class="modal-close" onclick="closeModal()">×</button></div><div class="validation-box ${result.ok?'success':'warn'}">已对账 ${result.items.length} 个目标部署；期望版本、实际版本与配置版本已写入 TargetDeployment。${result.ok?'全部一致。':'仍有目标未收敛，请检查离线节点。'}</div><div class="modal-actions"><button class="btn primary" onclick="closeModal();render()">完成</button></div>`);
+}
 function edgeSaveSyncPolicy(){const mode=document.getElementById('edge-sync-mode')?.value,offline=document.getElementById('edge-offline-policy')?.value,reconnect=document.getElementById('edge-reconnect-policy')?.value;window.EDGE_SYNC_POLICY={mode,offline,reconnect};showModal(`<div class="modal-head"><div><h2>同步策略已保存</h2><div class="sub">仅保存于当前原型会话</div></div><button class="modal-close" onclick="closeModal()">×</button></div><p>同步模式：${escapeHtml(mode)}<br>断网策略：${escapeHtml(offline)}<br>重连策略：${escapeHtml(reconnect)}</p><div class="modal-actions"><button class="btn primary" onclick="closeModal()">知道了</button></div>`);}
 
 function render(){
@@ -3489,7 +3770,7 @@ function render(){
   else if (state.view === 'mesh') main.innerHTML = isCapabilityEnabled('service-mesh')?viewMesh():viewCapabilities();
   else if (state.view === 'gateway') main.innerHTML = viewGateway();
   else if (state.view === 'cluster') main.innerHTML = viewCluster();
-  else if (state.view === 'cloud-edge') main.innerHTML = isCapabilityEnabled('cloud-edge')?viewCloudEdge():viewCapabilities();
+  else if (state.view === 'cloud-edge') { main.innerHTML = isCapabilityEnabled('cloud-edge')?viewCloudEdge():viewCapabilities(); decorateCloudEdgeClosure(); }
   else if (state.view === 'secrets') main.innerHTML = viewSecrets();
   else if (state.view === 'releases') main.innerHTML = viewReleases();
   else if (state.view === 'monitor') main.innerHTML = viewMonitor();
@@ -3549,6 +3830,179 @@ function backToApp(){ state.view = 'app'; state.tab = 'workload'; render(); }
 // 初始化
 render();
 </script>
+<script id="release-domain-core">
+/* Framework-free release domain core shared by the prototype and Node tests. */
+(function(root){
+  const RELEASE_STATES=Object.freeze([
+    'draft','queued','pending','deploying','validating','paused',
+    'rolling_back','rolled_back','partially_rolled_back','success','failed','cancelled'
+  ]);
+  const RELEASE_TRANSITIONS=Object.freeze({
+    draft:['queued','cancelled'],
+    queued:['deploying','cancelled','failed'],
+    pending:['queued','deploying','cancelled','failed'],
+    deploying:['validating','paused','rolling_back','cancelled','failed'],
+    validating:['success','paused','rolling_back','cancelled','failed'],
+    paused:['deploying','rolling_back','cancelled','failed'],
+    rolling_back:['rolled_back','partially_rolled_back','failed'],
+    rolled_back:[],
+    partially_rolled_back:['rolling_back'],
+    success:[],
+    failed:['deploying','rolling_back','cancelled'],
+    cancelled:['deploying','rolling_back']
+  });
+  const RELEASE_ACTIONS=Object.freeze({
+    draft:{start:'queued',cancel:'cancelled'},
+    queued:{start:'deploying',cancel:'cancelled',fail:'failed'},
+    pending:{queue:'queued',start:'deploying',cancel:'cancelled',fail:'failed'},
+    deploying:{validate:'validating',pause:'paused',rollback:'rolling_back',cancel:'cancelled',fail:'failed'},
+    validating:{success:'success',pause:'paused',rollback:'rolling_back',cancel:'cancelled',fail:'failed'},
+    paused:{resume:'deploying',rollback:'rolling_back',cancel:'cancelled',fail:'failed'},
+    rolling_back:{complete:'rolled_back',partial:'partially_rolled_back',fail:'failed'},
+    partially_rolled_back:{rollback:'rolling_back',cancel:'cancelled'},
+    success:{},
+    failed:{retry:'deploying',rollback:'rolling_back',cancel:'cancelled'},
+    cancelled:{retry:'deploying',rollback:'rolling_back'}
+  });
+  const EDGE_TRANSITIONS=Object.freeze({
+    pending:['waiting','paused','deploying','cancelled','failed'],
+    waiting:['deploying','paused','cancelled','failed'],
+    deploying:['validating','paused','rolling_back','cancelled','failed'],
+    validating:['success','paused','rolling_back','cancelled','failed'],
+    paused:['deploying','rolling_back','cancelled','failed'],
+    rolling_back:['rolled_back','partially_rolled_back','failed'],
+    rolled_back:[],
+    partially_rolled_back:['rolling_back'],
+    success:['rolling_back'],
+    failed:['deploying','rolling_back','cancelled'],
+    cancelled:['deploying','rolling_back']
+  });
+  const clone=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
+  const clampWeight=value=>Math.max(0,Math.min(100,Number(value)||0));
+  const normalizeVersion=value=>String(value??'').trim().replace(/^v/i,'');
+
+  function canReleaseTransition(from,to){
+    return from===to || (RELEASE_TRANSITIONS[from]||[]).includes(to);
+  }
+  function releaseActionTarget(from,action){
+    return RELEASE_ACTIONS[from]?.[String(action||'').toLowerCase()]||null;
+  }
+  function canEdgeTransition(from,to){
+    return from===to || (EDGE_TRANSITIONS[from]||[]).includes(to);
+  }
+  function reconcileVersionState(input={}){
+    const desiredVersion=String(input.desiredVersion??'').trim();
+    const observedVersion=String(input.observedVersion??'').trim();
+    const replicas=Math.max(0,Number(input.replicas)||0);
+    const ready=Math.max(0,Number(input.ready)||0);
+    let status='consistent';
+    if(!desiredVersion||!observedVersion)status='missing';
+    else if(normalizeVersion(desiredVersion)!==normalizeVersion(observedVersion))status='drift';
+    else if(input.nodeOnline===false||(replicas>0&&ready<replicas))status='degraded';
+    const result={
+      desiredVersion,
+      observedVersion,
+      reconcileStatus:status,
+      ready,
+      replicas,
+      reconciledAt:input.now||new Date().toISOString()
+    };
+    result.status=status;
+    return result;
+  }
+  function restoreTrafficBaseline(baseline={}){
+    const stableVersion=baseline.stableVersion||'stable';
+    const canaryVersion=baseline.canaryVersion||'';
+    const primaryWeight=clampWeight(baseline.primaryWeight);
+    const candidateWeight=clampWeight(baseline.candidateWeight);
+    const subsets=[{
+      name:stableVersion,
+      weight:primaryWeight,
+      labels:{version:stableVersion,track:'stable'}
+    }];
+    if(canaryVersion&&candidateWeight>0){
+      subsets.push({
+        name:canaryVersion,
+        weight:candidateWeight,
+        labels:{version:canaryVersion,track:'canary'}
+      });
+    }
+    return subsets;
+  }
+  function reconcileEdgeDeployment({deployment={},node={},desiredState={},now}={}){
+    const next=clone(deployment);
+    const online=node.status==='online';
+    if(online){
+      const desiredVersion=desiredState.desiredVersion||next.desiredVersion||next.observedVersion||'';
+      Object.assign(next,clone(desiredState),{desiredVersion});
+      next.observedVersion=desiredVersion;
+      next.syncSequence=(Number(next.syncSequence)||0)+1;
+      next.lastReportedAt=now||new Date().toISOString();
+      next.reconcileStatus=reconcileVersionState({
+        desiredVersion,
+        observedVersion:next.observedVersion,
+        ready:desiredState.ready??next.ready??1,
+        replicas:desiredState.replicas??next.replicas??1,
+        nodeOnline:true,
+        now:next.lastReportedAt
+      }).reconcileStatus;
+    }else{
+      next.reconcileStatus='degraded';
+      next.lastReportedAt=next.lastReportedAt||null;
+    }
+    return {deployment:next,online,changed:online};
+  }
+  function createAuditEvent(input={}){
+    const stamp=Date.now().toString(36);
+    const suffix=Math.random().toString(36).slice(2,8);
+    return {
+      id:input.id||`audit-${stamp}-${suffix}`,
+      time:input.time||new Date().toISOString(),
+      releaseId:input.releaseId||null,
+      action:input.action||'unknown',
+      from:input.from??null,
+      to:input.to??null,
+      actor:input.actor||'当前用户',
+      reason:input.reason||'未提供原因',
+      health:clone(input.health||null),
+      result:input.result||'recorded',
+      trafficBefore:clone(input.trafficBefore||null),
+      trafficAfter:clone(input.trafficAfter||null),
+      baselineVersion:input.baselineVersion||null
+    };
+  }
+  function summarizeReconciliation(items=[]){
+    const counts={consistent:0,missing:0,drift:0,degraded:0};
+    (items||[]).forEach(item=>{
+      const status=item?.reconcileStatus||item?.status;
+      if(Object.prototype.hasOwnProperty.call(counts,status))counts[status]+=1;
+      else counts.missing+=1;
+    });
+    return {
+      total:counts.consistent+counts.missing+counts.drift+counts.degraded,
+      counts,
+      consistent:counts.consistent===counts.consistent+counts.missing+counts.drift+counts.degraded,
+      checkedAt:new Date().toISOString()
+    };
+  }
+
+  root.CloudForgeReleaseDomain=Object.freeze({
+    RELEASE_STATES,
+    RELEASE_TRANSITIONS,
+    RELEASE_ACTIONS,
+    EDGE_TRANSITIONS,
+    canReleaseTransition,
+    releaseActionTarget,
+    canEdgeTransition,
+    normalizeVersion,
+    reconcileVersionState,
+    restoreTrafficBaseline,
+    reconcileEdgeDeployment,
+    createAuditEvent,
+    summarizeReconciliation
+  });
+})(typeof globalThis!=='undefined'?globalThis:this);
+</script>
 <script>
 /* CloudForge lifecycle hardening: explicit transition guards + optimistic rollback validation. */
 (function(){
@@ -3577,10 +4031,13 @@ render();
     const fresh=(app?.releases||[]).find(r=>!before.has(r.id)) || (app?.releases||[])[0];
     if(fresh){
       fresh.taskType='rollback';fresh.taskId=fresh.taskId||`rollback-${Date.now()}`;fresh.parentReleaseId=fresh.parentReleaseId||`release:${version}`;
+      fresh.status='rolled_back';fresh.phase='已回滚';fresh.rolledBackAt=new Date().toLocaleString();
       fresh.transitionHistory=fresh.transitionHistory||[];
-      fresh.transitionHistory.unshift({from:'previewed',to:'success',time:new Date().toLocaleString(),reason:'本地原型中同步完成回滚快照恢复'});
+      fresh.transitionHistory.unshift({from:'previewed',to:'rolled_back',time:new Date().toLocaleString(),reason:'本地原型中同步完成回滚快照恢复'});
       fresh.resourceFingerprint=workloadRevisionFingerprint(app);
       fresh.events=fresh.events||[];fresh.events.unshift({type:'Normal',time:new Date().toLocaleString(),reason:'RollbackTaskCreated',msg:`创建独立回滚任务 ${fresh.taskId}，目标版本 ${version}`});
+      fresh.audit=fresh.audit||[];
+      fresh.audit.unshift(window.CloudForgeReleaseDomain?.createAuditEvent?window.CloudForgeReleaseDomain.createAuditEvent({releaseId:fresh.id,action:'rollback',from:'previewed',to:'rolled_back',actor:fresh.operator||'当前用户',reason:`回滚到稳定版本 ${version}`,health:{restoredSnapshot:fresh.restoredSnapshot},result:'rolled_back',trafficBefore:fresh.trafficBefore||null,trafficAfter:fresh.trafficAfter||null,baselineVersion:fresh.versionBefore||null}):{id:`audit-${Date.now().toString(36)}`,time:new Date().toISOString(),releaseId:fresh.id,action:'rollback',from:'previewed',to:'rolled_back',actor:fresh.operator||'当前用户',reason:`回滚到稳定版本 ${version}`,result:'rolled_back',baselineVersion:fresh.versionBefore||null});
       persistDemoState();
     }
     rollbackPreviewFingerprint=null;rollbackPreviewVersion=null;rollbackPreviewAppId=null;
@@ -3619,14 +4076,9 @@ render();
     delete app.mesh.releaseTraffic;
     (app.components||[]).forEach(c=>{
       if(!c.mesh?.route)return;
-      if(before.source==='trafficPolicy'&&canaryVersion&&Number(before.candidateWeight)>0){
-        c.mesh.route.subsets=[
-          {name:stableVersion,weight:Number(before.primaryWeight),labels:{version:stableVersion,track:'stable'}},
-          {name:canaryVersion,weight:Number(before.candidateWeight),labels:{version:canaryVersion,track:'canary'}}
-        ];
-      }else{
-        c.mesh.route.subsets=[{name:stableVersion,weight:100,labels:{version:stableVersion,track:'stable'}}];
-      }
+      c.mesh.route.subsets=window.CloudForgeReleaseDomain?.restoreTrafficBaseline
+        ?window.CloudForgeReleaseDomain.restoreTrafficBaseline(before)
+        :[{name:stableVersion,weight:Number(before.primaryWeight)||100,labels:{version:stableVersion,track:'stable'}}];
     });
     (r.releaseTargets||[]).forEach(t=>{t.trafficWeight=t.role==='primary'?Number(before.primaryWeight):Number(before.candidateWeight);});
     r.trafficPhase=`已恢复发布前流量（${reason}）`;
@@ -3636,6 +4088,7 @@ render();
     r.trafficRecoveryReason=reason;
     r.trafficHistory=r.trafficHistory||[];
     r.trafficHistory.push({time:r.trafficRestoredAt,phase:`恢复发布前流量（${reason}）`,primaryWeight:Number(before.primaryWeight),candidateWeight:Number(before.candidateWeight),source:before.source||'snapshot'});
+    createReleaseAudit(r,'traffic-restore',r.status,r.status,{reason,result:'restored',trafficBefore:before,trafficAfter:{primaryWeight:Number(before.primaryWeight),candidateWeight:Number(before.candidateWeight),stableVersion,canaryVersion},baselineVersion:before.stableVersion||r.versionBefore});
     recordReleaseEvent(r,'Warning','ReleaseTrafficRestored',`发布未成功，已恢复发布前流量策略：${stableVersion} ${Number(before.primaryWeight)}% / ${canaryVersion||'无灰度版本'} ${Number(before.candidateWeight)}%；临时发布流量已清除`);
   }
   window.restoreReleaseTrafficBaseline=restoreTraffic;
@@ -3695,8 +4148,12 @@ render();
     if(!app)return;
     const active=activeTasks(app);
     if(active.some(r=>r.status==='deploying')) app.deployStatus='deploying';
+    else if(active.some(r=>r.status==='validating')) app.deployStatus='validating';
+    else if(active.some(r=>r.status==='rolling_back')) app.deployStatus='rolling_back';
     else if(active.some(r=>r.status==='paused')) app.deployStatus='paused';
     else if(currentRelease?.status==='success') app.deployStatus='success';
+    else if(currentRelease?.status==='rolled_back') app.deployStatus='rolled_back';
+    else if(currentRelease?.status==='partially_rolled_back') app.deployStatus='partial';
     else if(currentRelease?.status==='cancelled') app.deployStatus='cancelled';
     else if(currentRelease?.status==='failed') app.deployStatus='failed';
     app.releaseSummary=app.releaseSummary||{};
@@ -3806,8 +4263,13 @@ render();
     const checks=relevant.map(row=>{
       const actual=tagOf(row.workload.image).replace(/^v/,'');
       const ready=Number(row.workload.ready)>=Number(row.workload.replicas)&&Number(row.workload.replicas)>0;
-      const versionOk=actual===expected;
-      return {workloadId:row.id,name:workloadDisplayName(row.id,row.workload),image:row.workload.image||'',actualVersion:actual,expectedVersion:expected,selected:true,ready,versionOk,ok:versionOk&&ready};
+      const reconciled=window.CloudForgeReleaseDomain?.reconcileVersionState?.({
+        desiredVersion:row.workload.desiredVersion||release.version,
+        observedVersion:row.workload.observedVersion||actual,
+        ready:row.workload.ready,replicas:row.workload.replicas,nodeOnline:true
+      });
+      const versionOk=actual===expected&&(!reconciled||reconciled.status==='consistent');
+      return {workloadId:row.id,name:workloadDisplayName(row.id,row.workload),image:row.workload.image||'',actualVersion:actual,expectedVersion:expected,desiredVersion:row.workload.desiredVersion||release.version,reconcileStatus:reconciled?.status||'missing',selected:true,ready,versionOk,ok:versionOk&&ready};
     });
     const unselected=rows.filter(row=>!targetIds.has(row.id));
     const failed=checks.filter(x=>!x.ok);
@@ -3836,7 +4298,7 @@ render();
     const result=await originalExecute.apply(this,arguments);
     const app=typeof getApp==='function'?getApp(appId):null;
     const release=app?.releases?.find(r=>r.id===releaseId);
-    if(!app||!release||release.status!=='success')return result;
+    if(!app||!release||!['validating','success'].includes(release.status))return result;
     const report=checkReleaseResult(app,release);
     release.beforeSnapshot=release.beforeSnapshot||release.snapshot;
     release.versionConsistency=report;
@@ -3844,6 +4306,7 @@ render();
     release.versionState=release.versionState||{};
     if(report.complete){
       const appliedAt=new Date().toLocaleString();
+      if(release.status==='validating'&&!transitionReleaseStatus(release,'success',{action:'reconcile',reason:'VersionReconciliationPassed',health:{checks:report.checkedCount,failed:report.failedCount},result:'consistent',message:`版本对账通过：${report.checkedCount} 个目标期望版本与运行版本一致`}))return result;
       app.version=release.version;
       app.updatedAt=appliedAt;
       app.status='healthy';
@@ -3859,15 +4322,16 @@ render();
       release.versionState.appliedAt=appliedAt;
       release.appliedAt=appliedAt;
       release.trafficAfter=app.mesh?.releaseTraffic?JSON.parse(JSON.stringify(app.mesh.releaseTraffic)):null;
-      app.versionConsistency={status:'consistent',checkedAt:report.checkedAt,version:release.version,summary:'发布结果校验通过，应用版本、运行镜像、配置与流量已提交'};
+      app.versionConsistency={status:'consistent',checkedAt:report.checkedAt,version:release.version,desiredVersion:release.version,observedVersions:[...new Set((report.checks||[]).map(x=>x.actualVersion).filter(Boolean))],reconcileCounts:{consistent:report.checkedCount,failed:report.failedCount},summary:'发布结果校验通过，应用版本、运行镜像、配置与流量已提交'};
       release.afterSnapshot=captureReleaseSnapshot(app,release.version,release.targetWorkloadIds);
       recordReleaseEvent(release,'Normal','ReleaseResultApplied',`发布结果校验通过并完成原子提交：${report.checkedCount} 个目标版本和就绪状态符合预期，应用版本更新为 ${release.version}`);
     }else{
       // The task itself completed, but it must not become the application's current version.
+      if(release.status==='validating'&&!transitionReleaseStatus(release,'failed',{action:'reconcile',reason:'VersionReconciliationFailed',health:{checks:report.checkedCount,failed:report.failedCount},result:'inconsistent',message:report.summary}))return result;
       app.version=previousState.version??app.version;
       app.updatedAt=previousState.updatedAt;
       app.status=previousState.status;
-      app.versionConsistency={status:'inconsistent',checkedAt:report.checkedAt,version:release.version,summary:report.summary,failedCount:report.failedCount,unselectedCount:report.unselectedCount};
+      app.versionConsistency={status:'inconsistent',checkedAt:report.checkedAt,version:release.version,desiredVersion:release.version,observedVersions:[...new Set((report.checks||[]).map(x=>x.actualVersion).filter(Boolean))],reconcileCounts:{consistent:Math.max(0,report.checkedCount-report.failedCount),failed:report.failedCount},summary:report.summary,failedCount:report.failedCount,unselectedCount:report.unselectedCount};
       app.deployStatus='partial';
       release.current=false;
       if(typeof window.restoreReleaseTrafficBaseline==='function')window.restoreReleaseTrafficBaseline(app,release,'发布结果校验不一致');
@@ -3894,15 +4358,35 @@ render();
     const app=typeof getApp==='function'?getApp(state.appId):null;
     const release=app?.releases?.find(r=>r.id===releaseId);
     const result=originalDetails.apply(this,arguments);
-    if(!release?.versionConsistency)return result;
+    if(!release)return result;
     const root=document.querySelector('#modal-root');
     if(root){
       const report=release.versionConsistency;
-      const rows=(report.checks||[]).map(x=>`<tr><td>${escapeHtml(x.name||x.workloadId)}</td><td>${escapeHtml(x.actualVersion||'未知')}</td><td>${escapeHtml(x.expectedVersion||release.version)}</td><td>${x.ready?'就绪':'未就绪'}</td><td>${x.ok?'一致':'不一致'}</td></tr>`).join('');
-      const panel=document.createElement('div');
-      panel.innerHTML=`<div class="section-title" style="margin-top:14px">发布结果校验</div><div class="validation-box ${report.complete?'success':'warn'}">${escapeHtml(report.summary||'尚无校验摘要')} · 校验时间 ${escapeHtml(report.checkedAt||'—')}<br>检查目标 ${Number(report.checkedCount)||0} 个 · 不一致目标 ${Number(report.failedCount)||0} 个 · 未选择目标 ${Number(report.unselectedCount)||0} 个</div><div style="max-height:220px;overflow:auto"><table class="data-table"><thead><tr><th>工作负载</th><th>实际版本</th><th>期望版本</th><th>就绪</th><th>结果</th></tr></thead><tbody>${rows||'<tr><td colspan="5">暂无校验明细</td></tr>'}</tbody></table></div>`;
-      const section=[...root.querySelectorAll('.section-title')].find(el=>el.textContent.includes('流量与任务一致性'));
-      if(section)section.parentNode.insertBefore(panel,section);else root.appendChild(panel);
+      const insertBeforeEventPanel=panel=>{
+        const eventTitle=[...root.querySelectorAll('.section-title')].find(el=>el.textContent.includes('任务事件'));
+        if(eventTitle)eventTitle.parentNode.insertBefore(panel,eventTitle);else root.appendChild(panel);
+      };
+      if(report){
+        const rows=(report.checks||[]).map(x=>`<tr><td>${escapeHtml(x.name||x.workloadId)}</td><td>${escapeHtml(x.actualVersion||'未知')}</td><td>${escapeHtml(x.expectedVersion||release.version)}</td><td><span class="badge ${x.reconcileStatus==='consistent'?'green':x.reconcileStatus==='drift'?'red':'amber'}">${escapeHtml(x.reconcileStatus||'未知')}</span></td><td>${x.ready?'就绪':'未就绪'}</td><td>${x.ok?'一致':'不一致'}</td></tr>`).join('');
+        const panel=document.createElement('div');
+        panel.innerHTML=`<div class="section-title" style="margin-top:14px">发布结果校验</div><div class="validation-box ${report.complete?'success':'warn'}">${escapeHtml(report.summary||'尚无校验摘要')} · 校验时间 ${escapeHtml(report.checkedAt||'—')}<br>检查目标 ${Number(report.checkedCount)||0} 个 · 不一致目标 ${Number(report.failedCount)||0} 个 · 未选择目标 ${Number(report.unselectedCount)||0} 个</div><div style="max-height:220px;overflow:auto"><table class="data-table"><thead><tr><th>工作负载</th><th>实际版本</th><th>期望版本</th><th>对账</th><th>就绪</th><th>结果</th></tr></thead><tbody>${rows||'<tr><td colspan="6">暂无校验明细</td></tr>'}</tbody></table></div>`;
+        insertBeforeEventPanel(panel);
+      }
+      const auditEvents=Array.isArray(release.audit)?release.audit:[];
+      const auditRows=auditEvents.map(event=>`<div style="padding:11px 12px;border:1px solid var(--border);border-radius:9px;background:#fff"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${escapeHtml(event.action||'transition')}</b><span class="badge ${event.result==='denied'?'red':event.result==='consistent'||event.result==='restored'?'green':'gray'}">${escapeHtml(event.result||'recorded')}</span><span class="muted">${escapeHtml(event.from||'—')} → ${escapeHtml(event.to||'—')}</span></div><div class="release-meta" style="margin-top:5px">${escapeHtml(event.time||'—')} · ${escapeHtml(event.actor||'—')}</div><div style="margin-top:6px;font-size:12px;overflow-wrap:anywhere">${escapeHtml(event.reason||'—')}</div><div class="release-meta" style="margin-top:6px">基线 ${escapeHtml(event.baselineVersion||'—')} · 流量 ${Number(event.trafficBefore?.primaryWeight)||0}/${Number(event.trafficBefore?.candidateWeight)||0} → ${Number(event.trafficAfter?.primaryWeight)||0}/${Number(event.trafficAfter?.candidateWeight)||0}</div></div>`).join('');
+      const auditPanel=document.createElement('div');
+      auditPanel.innerHTML=`<div class="section-title" style="margin-top:14px">结构化审计</div><div class="validation-box info">记录操作者、状态前后值、健康检查、结果、发布基线与流量快照。${release.versionBefore?` 发布基线版本：${escapeHtml(release.versionBefore)}。`:''}</div><div style="display:grid;gap:8px;max-height:280px;overflow:auto">${auditRows||'<div class="empty">该任务尚无结构化审计记录</div>'}</div>`;
+      insertBeforeEventPanel(auditPanel);
+      if(['deploying','validating'].includes(release.status)){
+        const actions=root.querySelector('.modal-actions');
+        if(actions){
+          const pauseButton=document.createElement('button');
+          pauseButton.className='btn';
+          pauseButton.textContent='暂停发布任务';
+          pauseButton.setAttribute('onclick',`pauseReleaseTask('${app.id}','${release.id}')`);
+          actions.insertBefore(pauseButton,actions.firstChild);
+        }
+      }
     }
     return result;
   };
