@@ -486,6 +486,76 @@ input:checked + .slider:before{transform:translateX(18px)}
 .edge-closure-metric b{display:block;margin-top:5px;font-size:20px;line-height:1.2;color:var(--text)}
 .edge-closure-metric small{display:block;margin-top:5px;color:var(--text3);font-size:11px;white-space:normal;line-height:1.45}
 @media(max-width:900px){.edge-closure-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.edge-console.edge-fleet-mode .edge-hero{display:none!important}
+.edge-fleet-mode{max-width:1600px}
+.edge-fleet-mode .edge-tabs{flex-wrap:wrap;overflow:visible}
+.edge-fleet-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 2px 13px}
+.edge-fleet-head h1{font-size:22px;line-height:1.2;margin:0}
+.edge-fleet-head p{margin:5px 0 0;color:var(--text2);font-size:12.5px;line-height:1.55;max-width:720px}
+.edge-fleet-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.edge-fleet-node-select{display:none;min-width:220px;max-width:300px}
+.edge-fleet-metrics{margin-top:0;margin-bottom:12px}
+.edge-fleet-workbench{display:grid;grid-template-columns:228px minmax(0,1fr) 276px;gap:12px;align-items:start}
+.edge-fleet-scope,.edge-fleet-detail,.edge-fleet-inspector{border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden;min-width:0}
+.edge-fleet-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:13px 14px;border-bottom:1px solid var(--border)}
+.edge-fleet-panel-head b{font-size:13px}.edge-fleet-panel-head span{font-size:11px;color:var(--text2)}
+.edge-fleet-node-list{display:grid;gap:6px;padding:8px}
+.edge-fleet-scope-item{appearance:none;width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);text-align:left;font:inherit;transition:border-color .15s,background .15s}
+.edge-fleet-scope-item:hover{border-color:#c7cee6;background:var(--surface2,#f8f9fc)}
+.edge-fleet-scope-item.is-active{border-color:#bfc8f6;background:var(--primary-soft);box-shadow:inset 3px 0 var(--primary)}
+.edge-fleet-scope-item-top{display:flex;align-items:center;justify-content:space-between;gap:7px}
+.edge-fleet-scope-item-top b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-scope-item small{display:block;margin-top:5px;color:var(--text2);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-scope-empty{padding:26px 16px;text-align:center;color:var(--text2);font-size:12px}
+.edge-fleet-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:14px 15px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--surface),var(--surface2,#f8f9fc))}
+.edge-fleet-detail-head h2{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-detail-head p{margin:5px 0 0;color:var(--text2);font-size:11.5px;line-height:1.5}
+.edge-fleet-detail-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.edge-fleet-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--border);background:var(--surface)}
+.edge-fleet-summary>div{padding:11px 13px;border-left:1px solid var(--border);min-width:0}
+.edge-fleet-summary>div:first-child{border-left:0}
+.edge-fleet-summary span{display:block;font-size:10.5px;color:var(--text3)}
+.edge-fleet-summary b{display:block;margin-top:4px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-deployments{padding:10px;display:grid;gap:7px}
+.edge-fleet-deploy-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface2,#f8f9fc)}
+.edge-fleet-deploy-main{min-width:0}
+.edge-fleet-deploy-main b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-deploy-main code{display:block;margin-top:4px;color:var(--text2);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-deploy-meta{text-align:right;font-size:10.5px;color:var(--text2);white-space:nowrap}
+.edge-fleet-empty{padding:36px 18px;text-align:center;color:var(--text2);font-size:12px}
+.edge-fleet-inspector-body{padding:11px 13px}
+.edge-fleet-kv{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px dashed var(--border);font-size:11px;color:var(--text2)}
+.edge-fleet-kv:first-child{border-top:0}
+.edge-fleet-kv b{color:var(--text);font-weight:500;text-align:right;min-width:0;overflow-wrap:anywhere}
+.edge-fleet-related{margin-top:12px;padding-top:11px;border-top:1px solid var(--border)}
+.edge-fleet-related h3{font-size:11.5px;margin:0 0 7px}
+.edge-fleet-related-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px dashed var(--border);font-size:10.5px}
+.edge-fleet-related-item:first-of-type{border-top:0}
+.edge-fleet-related-item span:first-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edge-fleet-inspector-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:11px;border-top:1px solid var(--border)}
+.edge-fleet-register{width:100%;justify-content:center;margin-top:8px}
+.edge-console.edge-fleet-mode .table-wrap table{min-width:600px}
+.edge-console.edge-fleet-mode .table-wrap th,.edge-console.edge-fleet-mode .table-wrap td{padding-left:13px;padding-right:13px}
+@media(max-width:1200px){.edge-fleet-workbench{grid-template-columns:205px minmax(0,1fr)}.edge-fleet-inspector{grid-column:1/-1}}
+@media(max-width:1000px){
+  .edge-fleet-head{align-items:flex-start;flex-direction:column;padding-top:12px}
+  .edge-fleet-head-actions{width:100%;justify-content:space-between}
+  .edge-fleet-node-select{display:block;flex:1}
+  .edge-fleet-workbench{grid-template-columns:1fr}
+  .edge-fleet-scope,.edge-fleet-inspector{display:none}
+  .edge-fleet-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .edge-fleet-summary>div:nth-child(3){border-left:0;border-top:1px solid var(--border)}
+  .edge-fleet-summary>div:nth-child(4){border-top:1px solid var(--border)}
+}
+@media(max-width:640px){
+  .edge-fleet-detail-head{flex-direction:column}
+  .edge-fleet-detail-actions{justify-content:flex-start}
+  .edge-fleet-summary{grid-template-columns:1fr}
+  .edge-fleet-summary>div{border-left:0;border-top:1px solid var(--border)}
+  .edge-fleet-summary>div:first-child{border-top:0}
+  .edge-fleet-deploy-row{grid-template-columns:1fr}
+  .edge-fleet-deploy-meta{text-align:left}
+}
 .terminal-shell{border-radius:12px;overflow:hidden;border:1px solid #263142;background:#0d1117;box-shadow:0 12px 30px rgba(5,12,24,.24)}
 .terminal-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;background:#151b24;border-bottom:1px solid #263142;color:#cbd5e1}
 .terminal-bar b{font-size:12px}.terminal-bar span{font-size:11px;color:#8b98aa}
@@ -5150,6 +5220,92 @@ render();
   window.openPodTerminal=openPodTerminal;
   window.openEdgeTerminal=openEdgeTerminal;
   window.openCloudNodeTerminal=openCloudNodeTerminal;
+})();
+</script>
+
+<script>
+/* Cloud-edge fleet workbench: compact overview with persistent node inspector. */
+(function(){
+  function selectedEdgeFleetNode(){
+    let node=EDGE_NODES.find(item=>item.id===edgeSelectedNodeId);
+    if(!node)node=EDGE_NODES.find(item=>item.status==='online')||EDGE_NODES[0]||null;
+    edgeSelectedNodeId=node?.id||null;
+    return node;
+  }
+  function selectEdgeFleetNode(nodeId){
+    if(!EDGE_NODES.some(node=>node.id===nodeId))return null;
+    edgeSelectedNodeId=nodeId;
+    render();
+    return EDGE_NODES.find(node=>node.id===nodeId)||null;
+  }
+  function fleetPendingReleaseCount(){
+    return EDGE_RELEASES.filter(release=>!['success','cancelled','rolled_back','partially_rolled_back'].includes(edgeReleaseStateKey(release))).length;
+  }
+  function fleetNodeDeployments(nodeId){
+    return TARGET_DEPLOYMENTS.filter(deployment=>deployment.targetId===nodeId&&deployment.targetKind==='edge');
+  }
+  function fleetNodeDevices(nodeId){return EDGE_DEVICES.filter(device=>device.node===nodeId);}
+  function fleetNodeReleases(nodeId){
+    return EDGE_RELEASES.filter(release=>(release.targetSnapshot||[]).some(target=>target.kind==='edge'&&target.id===nodeId)).slice(0,3);
+  }
+  function fleetScopeHTML(selected){
+    if(!EDGE_NODES.length)return `<div class="edge-fleet-scope-empty">暂无边缘节点</div>`;
+    return EDGE_NODES.map(node=>`<button type="button" class="edge-fleet-scope-item ${node.id===selected?.id?'is-active':''}" data-node-id="${escapeHtml(node.id)}" onclick="selectEdgeFleetNode('${escapeHtml(node.id)}')"><div class="edge-fleet-scope-item-top"><b>${escapeHtml(node.name)}</b>${edgeStatusBadge(node.status)}</div><small>${escapeHtml(node.site)} · ${fleetNodeDeployments(node.id).length} 个部署</small></button>`).join('');
+  }
+  function fleetDeploymentRows(node){
+    const deployments=fleetNodeDeployments(node.id);
+    if(!deployments.length)return `<div class="edge-fleet-empty">该节点暂无目标部署。<div style="margin-top:12px"><button class="btn sm primary" onclick="edgeActiveTab='deployments';render()">创建目标部署</button></div></div>`;
+    return deployments.map(deployment=>{
+      const app=targetDeploymentApp(deployment),component=targetDeploymentComponent(deployment),workload=targetDeploymentWorkload(deployment);
+      const reconcile=deployment.reconcileStatus||(deployment.desiredVersion===deployment.observedVersion?'consistent':'drift');
+      const badge=reconcile==='consistent'?'green':reconcile==='degraded'?'amber':'red';
+      return `<div class="edge-fleet-deploy-row"><div class="edge-fleet-deploy-main"><b>${escapeHtml(component?.name||deployment.componentId)} · ${escapeHtml(app?.name||deployment.appId)}</b><code>${escapeHtml(workload?.image||`${deployment.desiredVersion} → ${deployment.observedVersion}`)}</code></div><div class="edge-fleet-deploy-meta"><span class="badge ${badge}">${reconcile==='consistent'?'一致':reconcile==='degraded'?'降级':'漂移'}</span><div style="margin-top:5px">${escapeHtml(deployment.desiredVersion||'—')} / ${escapeHtml(deployment.observedVersion||'—')}</div></div></div>`;
+    }).join('');
+  }
+  function fleetInspectorHTML(node){
+    const deployments=fleetNodeDeployments(node.id),devices=fleetNodeDevices(node.id),releases=fleetNodeReleases(node.id);
+    const consistent=deployments.filter(item=>(item.reconcileStatus||(item.desiredVersion===item.observedVersion?'consistent':'drift'))==='consistent').length;
+    const deviceRows=devices.length?devices.slice(0,4).map(device=>`<div class="edge-fleet-related-item"><span>${escapeHtml(device.name)}</span>${edgeStatusBadge(device.status)}</div>`).join(''):'<div class="edge-fleet-related-item"><span>暂无设备</span></div>';
+    const releaseRows=releases.length?releases.map(release=>`<div class="edge-fleet-related-item"><span>${escapeHtml(release.app)} · ${escapeHtml(release.version)}</span><span class="badge gray">${escapeHtml(edgeReleaseStateMeta(release).label)}</span></div>`).join(''):'<div class="edge-fleet-related-item"><span>暂无协同发布</span></div>';
+    return `<div class="edge-fleet-panel-head"><div><b>节点检查器</b><span>${escapeHtml(node.id)}</span></div>${edgeStatusBadge(node.status)}</div><div class="edge-fleet-inspector-body"><div class="edge-fleet-kv"><span>站点</span><b>${escapeHtml(node.site)}</b></div><div class="edge-fleet-kv"><span>Agent</span><b>${escapeHtml(node.version||'—')}</b></div><div class="edge-fleet-kv"><span>版本对账</span><b>${consistent} / ${deployments.length} 一致</b></div><div class="edge-fleet-kv"><span>同步序号</span><b>#${Number(node.syncSequence)||0}</b></div><div class="edge-fleet-kv"><span>最近同步</span><b>${escapeHtml(node.lastSync||'—')}</b></div><div class="edge-fleet-related"><h3>端侧设备</h3>${deviceRows}</div><div class="edge-fleet-related"><h3>协同发布</h3>${releaseRows}</div><div class="edge-fleet-inspector-actions"><button class="btn sm" onclick="openEdgeTerminal('${escapeHtml(node.id)}')">Agent 终端</button><button class="btn sm" ${node.status==='offline'?'disabled':''} onclick="edgeSyncNode('${escapeHtml(node.id)}')">立即对账</button><button class="btn sm primary" onclick="edgeFocusNode('${escapeHtml(node.id)}')">节点详情</button></div></div>`;
+  }
+  function fleetDetailHTML(node){
+    if(!node)return `<div class="edge-fleet-empty">暂无边缘节点。<div style="margin-top:12px"><button class="btn primary" onclick="edgeAddNodeModal()">注册边缘节点</button></div></div>`;
+    const deployments=fleetNodeDeployments(node.id),devices=fleetNodeDevices(node.id);
+    return `<div class="edge-fleet-detail-head"><div><h2>${escapeHtml(node.name)}</h2><p>${escapeHtml(node.site)} · ${escapeHtml(node.id)} · ${escapeHtml(node.mode||'边缘运行')}</p></div><div class="edge-fleet-detail-actions">${edgeStatusBadge(node.status)}<button class="btn sm" onclick="edgeFocusNode('${escapeHtml(node.id)}')">节点详情</button><button class="btn sm primary" onclick="edgeActiveTab='rollout';render()">创建发布</button></div></div><div class="edge-fleet-summary"><div><span>目标部署</span><b>${deployments.length}</b></div><div><span>端侧设备</span><b>${devices.length}</b></div><div><span>Agent</span><b>${escapeHtml(node.version||'—')}</b></div><div><span>同步序号</span><b>#${Number(node.syncSequence)||0}</b></div></div><div class="edge-fleet-deployments">${fleetDeploymentRows(node)}</div>`;
+  }
+  function decorateCloudEdgeFleet(){
+    if(state.view!=='cloud-edge')return;
+    const mount=document.querySelector('#main .edge-console');
+    if(!mount)return;
+    mount.classList.add('edge-fleet-mode');
+    const tabs=mount.querySelector('.edge-tabs');
+    if(!tabs)return;
+    const labels={overview:'运行总览',nodes:'节点',targets:'目标组',deployments:'部署实例',rollout:'协同发布',devices:'设备',sync:'同步策略'};
+    tabs.querySelectorAll('.tab').forEach(button=>{const source=button.getAttribute('onclick')||'';const match=source.match(/edgeActiveTab='([^']+)'/);if(match&&labels[match[1]])button.textContent=labels[match[1]];});
+    const online=EDGE_NODES.filter(node=>node.status==='online').length;
+    const deployments=TARGET_DEPLOYMENTS.length;
+    const consistent=TARGET_DEPLOYMENTS.filter(item=>(item.reconcileStatus||(item.desiredVersion===item.observedVersion?'consistent':'drift'))==='consistent').length;
+    const pending=fleetPendingReleaseCount();
+    if(!mount.querySelector('.edge-fleet-head')){
+      const nodeOptions=EDGE_NODES.map(node=>`<option value="${escapeHtml(node.id)}">${escapeHtml(node.name)}${node.status==='online'?'':'（离线）'}</option>`).join('');
+      const head=`<section class="edge-fleet-head"><div><h1>云边端协同</h1><p>以节点和部署目标为工作主线，持续对照云端期望态、边缘实际态与同步状态。</p></div><div class="edge-fleet-head-actions"><select id="edge-fleet-node-select" class="form-control edge-fleet-node-select" onchange="selectEdgeFleetNode(this.value)">${nodeOptions}</select><button class="btn primary" onclick="edgeActiveTab='rollout';render()">创建协同发布</button></div></section>`;
+      const metrics=`<section class="edge-closure-strip edge-fleet-metrics"><div class="edge-closure-metric"><span>节点在线</span><b>${online} / ${EDGE_NODES.length}</b><small>${EDGE_NODES.length-online} 个节点离线</small></div><div class="edge-closure-metric"><span>目标部署</span><b>${deployments}</b><small>${fleetPendingReleaseCount()?pending+' 个发布待处理':'无待处理发布'}</small></div><div class="edge-closure-metric"><span>版本对账</span><b>${consistent} / ${deployments}</b><small>${deployments-consistent} 个目标需关注</small></div><div class="edge-closure-metric"><span>端侧设备</span><b>${EDGE_DEVICES.length}</b><small>${EDGE_DEVICES.filter(device=>device.status==='online').length} 个设备在线</small></div></section>`;
+      tabs.insertAdjacentHTML('beforebegin',head+metrics);
+    }
+    if(edgeActiveTab==='overview'){
+      const selected=selectedEdgeFleetNode();
+      const selector=mount.querySelector('#edge-fleet-node-select');if(selector&&selected)selector.value=selected.id;
+      if(!mount.querySelector('.edge-fleet-workbench')){
+        tabs.insertAdjacentHTML('afterend',`<div class="edge-fleet-workbench"><aside class="edge-fleet-scope"><div class="edge-fleet-panel-head"><div><b>目标范围</b><span>${EDGE_NODES.length} 个边缘节点</span></div><button class="btn sm primary" onclick="edgeAddNodeModal()">注册</button></div><div class="edge-fleet-node-list">${fleetScopeHTML(selected)}</div></aside><section class="edge-fleet-detail">${fleetDetailHTML(selected)}</section><aside class="edge-fleet-inspector">${selected?fleetInspectorHTML(selected):'<div class="edge-fleet-empty">暂无节点</div>'}</aside></div>`);
+      }
+      const workbench=mount.querySelector('.edge-fleet-workbench');
+      [...mount.children].forEach(child=>{if(child!==tabs&&child!==workbench&&!child.classList.contains('edge-fleet-head')&&!child.classList.contains('edge-fleet-metrics'))child.style.display='none';});
+    }
+  }
+  window.decorateCloudEdgeClosure=decorateCloudEdgeFleet;
+  window.selectedEdgeFleetNode=selectedEdgeFleetNode;
+  window.selectEdgeFleetNode=selectEdgeFleetNode;
 })();
 </script>
 
