@@ -15,6 +15,7 @@
   --red:#e5484d;--red-soft:#fdecec;
   --mesh:#7c5cbf;--mesh-soft:#f2eefb;
   --radius:10px;
+    --page-max:1480px;
   --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
 }
 body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
@@ -60,6 +61,20 @@ main{flex:1;min-width:0}
 /* 通用组件 */
 .page{padding:24px 28px;max-width:1400px}
 .page-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;gap:16px}
+.page.ops-page{width:100%;max-width:var(--page-max);min-height:calc(100vh - 56px);padding:24px 28px 40px}
+.ops-page>.page-head{align-items:center;margin-bottom:18px}
+.ops-page .page-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.ops-page .resource-stats{gap:12px;margin:0 0 16px}
+.ops-page .resource-stat{min-height:94px;padding:14px 16px;border-radius:8px}
+.ops-page .list-toolbar{margin-bottom:12px;padding:10px 12px;border-radius:8px}
+.ops-page .table-scroll,.ops-page .table-wrap{width:100%;max-width:100%;overflow-x:auto;border-radius:8px}
+.ops-page table.card{min-width:860px}
+.ops-page .table-wrap>table{width:100%;min-width:860px;border-collapse:collapse}
+.ops-page th{position:sticky;top:0;z-index:1}
+.ops-page .row-actions{flex-wrap:wrap;min-width:0}
+.ops-page .persist-note{margin-top:12px}
+.ops-page .arch-app{border-radius:8px}
+.ops-page .arch-components{gap:12px}
 h1{font-size:20px;font-weight:600;letter-spacing:-.2px;white-space:nowrap}
 .sub{color:var(--text2);margin-top:5px;font-size:13px}
 .btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:7px 14px;font-size:12.5px;cursor:pointer;color:var(--text);transition:.15s;font-weight:500;display:inline-flex;align-items:center;gap:6px}
@@ -640,6 +655,9 @@ input:checked + .slider:before{transform:translateX(18px)}
   .sidebar .nav-item{flex:0 0 auto;margin:0 2px;padding:8px 11px}
   main{width:100%;min-width:0;overflow-x:clip}
   .page{width:100%;max-width:none;padding:18px 14px}
+  .page.ops-page{padding-bottom:40px;min-height:calc(100vh - 56px)}
+  .ops-page .table-scroll>table.card{min-width:860px}
+  .ops-page>.page-head{align-items:flex-start;flex-wrap:wrap}
   .page-head{flex-wrap:wrap}
   .page-head>div{flex:1 1 220px;min-width:0}
   .page-head>.btn{flex:0 0 auto}
@@ -1631,7 +1649,7 @@ function viewApps(){
   const meshCount=meshCapability?APPS.filter(a=>a.mesh?.enabled).length:0;
   const enabledCapabilities=CAPABILITY_CATALOG.filter(cap=>isCapabilityEnabled(cap.id)).length;
   const componentCount=APPS.reduce((n,a)=>n+a.components.length,0);
-  return `<div class="page">
+  return `<div class="page ops-page" data-page-kind="apps">
     <div class="page-head"><div><h1>应用</h1><div class="sub">统一管理应用生命周期、组件编排、发布版本与运行状态</div></div><button class="btn primary" onclick="startCreateApp()">+ 新建应用</button></div>
     <div class="resource-stats"><div class="resource-stat"><div class="label">应用总数</div><div class="value">${APPS.length}</div><div class="hint">当前工作空间</div></div><div class="resource-stat"><div class="label">健康应用</div><div class="value" style="color:var(--green)">${healthy}</div><div class="hint">健康状态正常</div></div><div class="resource-stat"><div class="label">组件总数</div><div class="value">${componentCount}</div><div class="hint">所有应用中的组件</div></div><div class="resource-stat"><div class="label">${meshCapability?'服务网格接入':'扩展能力'}</div><div class="value">${meshCapability?meshCount:enabledCapabilities}</div><div class="hint">${meshCapability?'已启用网格的应用':'当前启用的可选能力'}</div></div></div>
     <div class="list-toolbar"><input class="form-control search-input" placeholder="搜索应用名称、描述、负责人或版本…" oninput="filterRows('apps-table',this.value, 'app-env-filter','app-status-filter')"><select id="app-env-filter" class="form-control" onchange="filterRows('apps-table',document.querySelector('.search-input').value,'app-env-filter','app-status-filter')"><option value="">全部环境</option><option value="prod">生产</option><option value="staging">预发</option><option value="dev">开发</option></select><select id="app-status-filter" class="form-control" onchange="filterRows('apps-table',document.querySelector('.search-input').value,'app-env-filter','app-status-filter')"><option value="">全部状态</option><option value="empty">未配置</option><option value="pending">待部署</option><option value="healthy">健康</option><option value="degraded">降级</option><option value="unhealthy">异常</option></select><button class="btn" onclick="resetDemoData()">重置演示数据</button></div>
@@ -1654,10 +1672,10 @@ function viewComponents(){
   }).join('');
   const healthy=allComponents.filter(c=>c.workload?.health==='healthy').length;
   const mesh=meshCapability?allComponents.filter(c=>c.workload?.sidecar?.injected).length:0;
-  return `<div class="page"><div class="page-head"><div><h1>组件</h1><div class="sub">全局组件视图：查看组件定义、所属应用、运行时映射${meshCapability?'和网格状态':''}</div></div><button class="btn" onclick="openComponentEditor()">+ 独立新建组件</button><button class="btn primary" onclick="startCreateApp()">+ 新建应用</button></div>
+  return `<div class="page ops-page" data-page-kind="components"><div class="page-head"><div><h1>组件</h1><div class="sub">全局组件视图：查看组件定义、所属应用、运行时映射${meshCapability?'和网格状态':''}</div></div><div class="page-actions"><button class="btn" onclick="openComponentEditor()">+ 独立新建组件</button><button class="btn primary" onclick="startCreateApp()">+ 新建应用</button></div></div>
     <div class="resource-stats"><div class="resource-stat"><div class="label">组件总数</div><div class="value">${allComponents.length}</div><div class="hint">跨应用统计</div></div><div class="resource-stat"><div class="label">健康组件</div><div class="value" style="color:var(--green)">${healthy}</div><div class="hint">运行状态正常</div></div><div class="resource-stat"><div class="label">${meshCapability?'网格 Sidecar':'核心依赖'}</div><div class="value">${meshCapability?mesh:'解耦'}</div><div class="hint">${meshCapability?'已注入代理的组件':'组件不绑定扩展能力'}</div></div><div class="resource-stat"><div class="label">待检查</div><div class="value">${allComponents.length-healthy}</div><div class="hint">降级或异常组件</div></div></div>
     <div class="list-toolbar"><input class="form-control search-input" placeholder="搜索组件、应用或镜像…" oninput="filterRows('components-table',this.value,'component-type-filter','component-health-filter')"><select id="component-type-filter" class="form-control" onchange="filterRows('components-table',document.querySelector('#components-search')?.value||document.querySelector('.list-toolbar .search-input').value,'component-type-filter','component-health-filter')"><option value="">全部类型</option><option value="gateway">Gateway</option><option value="service">Service</option><option value="database">Database</option><option value="cache">Cache</option><option value="worker">Worker</option><option value="custom">Custom</option></select><select id="component-health-filter" class="form-control" onchange="filterRows('components-table',document.querySelector('.list-toolbar .search-input').value,'component-type-filter','component-health-filter')"><option value="">全部健康状态</option><option value="healthy">健康</option><option value="degraded">降级</option><option value="unhealthy">异常</option></select></div>
-    <div class="table-scroll"><table class="card" id="components-table"><thead><tr><th style="width:24%">组件名称 / 镜像</th><th style="width:12%">类型</th><th style="width:18%">所属应用</th><th style="width:14%">工作负载映射</th><th style="width:12%">健康状态</th><th style="width:10%">网格 / Sidecar</th><th style="width:10%">操作</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">暂无组件</td></tr>'}</tbody></table></div>
+    <div class="table-scroll"><table class="card" id="components-table"><thead><tr><th style="width:22%">组件名称 / 镜像</th><th style="width:10%">类型</th><th style="width:16%">所属应用</th><th style="width:12%">工作负载映射</th><th style="width:10%">健康状态</th><th style="width:10%">网格 / Sidecar</th><th style="width:20%">操作</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="empty">暂无组件</td></tr>'}</tbody></table></div>
     <div class="persist-note">组件定义支持独立创建、编辑和删除；组件默认关联一个主工作负载（workloadId）；蓝绿/灰度等临时目标由发布任务的 ReleaseTarget 管理。依赖关系在保存前进行完整性与循环校验。</div></div>`;
 }
 function viewWorkloads(){
@@ -1678,7 +1696,7 @@ function viewWorkloads(){
   }).join('');
   const ready=allWorkloads.reduce((n,w)=>n+(Number(w.ready)||0),0), desired=allWorkloads.reduce((n,w)=>n+(Number(w.replicas)||0),0);
   const unhealthy=allWorkloads.filter(w=>w.health!=='healthy').length;
-  return `<div class="page"><div class="page-head"><div><h1>工作负载</h1><div class="sub">运行时视图：管理控制器、副本、Pod 与资源请求${meshCapability?'，并查看 Sidecar 状态':''}</div></div><button class="btn" onclick="showBusinessModelAudit()">校验业务模型</button></div>
+  return `<div class="page ops-page" data-page-kind="workloads"><div class="page-head"><div><h1>工作负载</h1><div class="sub">运行时视图：管理控制器、副本、Pod 与资源请求${meshCapability?'，并查看 Sidecar 状态':''}</div></div><button class="btn" onclick="showBusinessModelAudit()">校验业务模型</button></div>
     <div class="resource-stats"><div class="resource-stat"><div class="label">工作负载数</div><div class="value">${allWorkloads.length}</div><div class="hint">Deployment / StatefulSet 等</div></div><div class="resource-stat"><div class="label">就绪副本</div><div class="value" style="color:var(--green)">${ready}<small style="font-size:14px;color:var(--text2)"> / ${desired}</small></div><div class="hint">当前就绪 / 期望</div></div><div class="resource-stat"><div class="label">异常工作负载</div><div class="value" style="color:${unhealthy?'var(--red)':'var(--green)'}">${unhealthy}</div><div class="hint">需要进一步排查</div></div><div class="resource-stat"><div class="label">Pod 总数</div><div class="value">${allWorkloads.reduce((n,w)=>n+(w.pods?.length||0),0)}</div><div class="hint">模拟运行时数据</div></div></div>
     <div class="list-toolbar"><input class="form-control search-input" placeholder="搜索工作负载、应用或镜像…" oninput="filterRows('workloads-table',this.value,'workload-type-filter','workload-health-filter')"><select id="workload-type-filter" class="form-control" onchange="filterRows('workloads-table',document.querySelector('.list-toolbar .search-input').value,'workload-type-filter','workload-health-filter')"><option value="">全部控制器</option><option value="Deployment">Deployment</option><option value="StatefulSet">StatefulSet</option><option value="DaemonSet">DaemonSet</option><option value="Job">Job</option></select><select id="workload-health-filter" class="form-control" onchange="filterRows('workloads-table',document.querySelector('.list-toolbar .search-input').value,'workload-type-filter','workload-health-filter')"><option value="">全部健康状态</option><option value="healthy">健康</option><option value="degraded">降级</option><option value="unhealthy">异常</option></select></div>
     <div class="table-scroll"><table class="card" id="workloads-table"><thead><tr><th style="width:22%">工作负载名称 / 镜像</th><th style="width:12%">控制器类型</th><th style="width:18%">所属组件</th><th style="width:16%">所属应用</th><th style="width:10%">副本就绪</th><th style="width:10%">健康状态</th><th style="width:10%">Sidecar</th><th style="width:8%">操作</th></tr></thead><tbody>${rows||'<tr><td colspan="8" class="empty">暂无工作负载</td></tr>'}</tbody></table></div></div>`;
@@ -1753,7 +1771,7 @@ function viewArchitecture(){
     const statusLabel=binding.status==='active'?'有效':binding.status==='degraded'?'降级':binding.status==='retired'?'已退休':binding.status;
     return `<tr><td><span class="badge ${meta.color}">${meta.label}</span></td><td><b>${escapeHtml(app?.name||binding.appId||'全局')}</b><div class="muted">${escapeHtml(component?.name||binding.componentId||'—')}</div></td><td><b>${escapeHtml(workloadDisplayName(binding.workloadId,workload))}</b><div class="muted mono">${escapeHtml(binding.workloadId)}</div></td><td>${escapeHtml(workloadBindingContext(binding))}</td><td>${binding.releaseId?`<span class="mono">${escapeHtml(binding.releaseId)}</span>`:binding.targetId?`<span class="mono">${escapeHtml(binding.targetId)}</span>`:'<span class="muted">核心绑定</span>'}</td><td><span class="badge ${binding.status==='active'?'green':'amber'}">${escapeHtml(statusLabel)}</span><div class="muted">${(binding.history||[]).length} 次状态变更</div></td></tr>`;
   }).join('');
-  return `<div class="page"><div class="page-head"><div><h1>架构关系</h1><div class="sub">应用负责业务边界，组件版本负责不可变定义，工作负载通过统一 WorkloadBinding 管理运行关系。</div></div><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap"><span class="badge blue">${COMPONENT_VERSIONS.length} 个组件版本</span><span class="badge gray">${activeBindings.length} 条有效绑定</span><button class="btn" onclick="goNav('components')">组件列表</button></div></div>
+  return `<div class="page ops-page" data-page-kind="architecture"><div class="page-head"><div><h1>架构关系</h1><div class="sub">应用负责业务边界，组件版本负责不可变定义，工作负载通过统一 WorkloadBinding 管理运行关系。</div></div><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap"><span class="badge blue">${COMPONENT_VERSIONS.length} 个组件版本</span><span class="badge gray">${activeBindings.length} 条有效绑定</span><button class="btn" onclick="goNav('components')">组件列表</button></div></div>
     <div class="resource-stats"><div class="resource-stat"><div class="label">应用</div><div class="value">${APPS.length}</div><div class="hint">业务边界 / 环境 / 发布入口</div></div><div class="resource-stat"><div class="label">组件</div><div class="value">${componentCount}</div><div class="hint">逻辑配置 / 依赖关系</div></div><div class="resource-stat"><div class="label">工作负载资源</div><div class="value">${workloadCount}</div><div class="hint">独立存储运行时状态</div></div><div class="resource-stat"><div class="label">关联覆盖率</div><div class="value">${componentCount?Math.round(linked/componentCount*100):0}%</div><div class="hint">${linked} / ${componentCount} 个组件已关联</div></div></div>
     <div class="arch-explainer"><b>解耦边界</b><span><strong>应用</strong>：生命周期、环境、负责人和发布编排</span><span><strong>组件</strong>：类型、端口、依赖、业务配置</span><span><strong>工作负载</strong>：控制器、副本、Pod、镜像、资源和运行事件</span><span class="muted">核心模型只依赖稳定 ID 和显式引用；业务组件的镜像与运行配置统一通过发布任务写入。服务网格、云边端协同属于可选扩展${edgeCapability?'；当前云边 TargetDeployment 只保存组件与目标的绑定':'；当前未启用云边扩展'}。</span></div>
     <section class="card" style="margin-top:16px"><div class="card-head"><div><h3>工作负载绑定关系</h3><div class="sub">当前有效绑定 ${activeBindings.length} 条 · 历史退休绑定 ${retiredBindings.length} 条</div></div><div style="display:flex;gap:7px;flex-wrap:wrap"><button class="btn sm" onclick="state.showRetiredBindings=!state.showRetiredBindings;render()">${state.showRetiredBindings?'仅看有效绑定':'查看历史绑定'}</button><button class="btn sm" onclick="showBusinessModelAudit()">校验绑定</button></div></div><div class="table-wrap"><table><thead><tr><th>角色</th><th>应用 / 组件</th><th>工作负载</th><th>目标上下文</th><th>发布 / 目标</th><th>状态</th></tr></thead><tbody>${bindingRows||'<tr><td colspan="6" class="empty">暂无工作负载绑定</td></tr>'}</tbody></table></div></section>
