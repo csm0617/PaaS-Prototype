@@ -35,13 +35,26 @@ button{font-family:inherit; white-space: nowrap;}
 
 /* 布局 */
 .layout{display:flex;min-height:calc(100vh - 56px);min-width:860px}
-.sidebar{width:200px;background:#fff;border-right:1px solid var(--border);padding:12px 10px;flex-shrink:0}
+.sidebar{width:200px;background:#fff;border-right:1px solid var(--border);padding:12px 10px;flex-shrink:0;overflow-y:auto;scrollbar-width:thin}
 .nav-group{font-size:11px;color:var(--text3);padding:8px 12px 6px;letter-spacing:.5px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;color:var(--text2);cursor:pointer;font-size:13px;margin-bottom:2px;transition:.15s;white-space:nowrap}
 .nav-item:hover{background:#f7f8fc}
 .nav-item.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
 .nav-item .ico{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex-shrink:0}
 .nav-item .ico .gi{width:15px;height:15px}
+.nav-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-cluster{display:block}
+.nav-toggle{margin-left:auto;width:22px;height:22px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--text3);display:grid;place-items:center;flex-shrink:0}
+.nav-toggle:hover{background:rgba(66,87,216,.08);color:var(--primary)}
+.nav-toggle .gi{width:12px;height:12px;transition:transform .16s}
+.nav-toggle[aria-expanded="true"] .gi{transform:rotate(90deg)}
+.nav-submenu{display:none;padding:1px 0 5px 25px}
+.nav-submenu.open{display:grid;gap:1px}
+.nav-subitem{appearance:none;display:flex;align-items:center;width:100%;min-width:0;padding:6px 9px;border:0;border-radius:6px;background:transparent;color:var(--text2);text-align:left;font:12px/1.35 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-subitem:hover{background:#f7f8fc;color:var(--text)}
+.nav-subitem.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+@media(min-width:901px){.edge-console.edge-fleet-mode .edge-tabs{display:none!important}.gateway-detail-tabs{display:none!important}}
+@media(max-width:900px){.nav-cluster{display:contents}.nav-toggle,.nav-submenu{display:none!important}}
 main{flex:1;min-width:0}
 
 /* 通用组件 */
@@ -1040,7 +1053,7 @@ const ALERTS = [
   { id: 'a-2', level: 'warning', rule: 'HighMemoryUsage', app: '电商交易平台', comp: 'order-service', msg: '内存使用率达到限制的 85%', time: '2026-10-19 08:15' },
 ];
 
-const state = { view:'apps', appId:null, compId:null, workloadId:null, tab:'overview', activeNav:'apps', inspectorOpen: true, gatewayAppId:null, editingRouteId:null };
+const state = { view:'apps', appId:null, compId:null, workloadId:null, tab:'overview', activeNav:'apps', inspectorOpen: true, gatewayAppId:null, editingRouteId:null, expandedNav:{gateway:false,'cloud-edge':false} };
 const getApp = id => APPS.find(a => a.id === id);
 
 // 平台能力注册表：核心业务模型不依赖这些扩展能力，扩展状态单独持久化。
@@ -1468,6 +1481,54 @@ function statusBadge(s){
   return '<span class="badge gray">未知</span>';
 }
 
+const SIDEBAR_SUBMENUS=Object.freeze({
+  gateway:[
+    {id:'route',name:'路由详情'},
+    {id:'traffic',name:'灰度流量'},
+    {id:'checks',name:'配置检查'}
+  ],
+  'cloud-edge':[
+    {id:'overview',name:'运行总览'},
+    {id:'nodes',name:'边缘节点'},
+    {id:'targets',name:'目标组'},
+    {id:'deployments',name:'部署实例'},
+    {id:'rollout',name:'协同发布'},
+    {id:'devices',name:'端侧设备'},
+    {id:'sync',name:'同步策略'}
+  ]
+});
+function sidebarGroupExpanded(id){
+  if(state.expandedNav&&Object.prototype.hasOwnProperty.call(state.expandedNav,id))return !!state.expandedNav[id];
+  return (id==='cloud-edge'&&state.view==='cloud-edge')||(id==='gateway'&&state.view==='gateway');
+}
+function toggleSidebarGroup(id){
+  if(!SIDEBAR_SUBMENUS[id])return;
+  const willOpen=!sidebarGroupExpanded(id);
+  state.expandedNav={gateway:false,'cloud-edge':false};
+  state.expandedNav[id]=willOpen;
+  renderSidebar();
+}
+function sidebarChildActive(parentId,childId){
+  if(parentId==='cloud-edge')return state.view==='cloud-edge'&&edgeActiveTab===childId;
+  if(parentId==='gateway')return state.view==='gateway'&&(state.gatewayTab||'route')===childId;
+  return false;
+}
+function goSidebarChild(parentId,childId){
+  const children=SIDEBAR_SUBMENUS[parentId]||[];
+  if(!children.some(child=>child.id===childId))return;
+  if(parentId==='cloud-edge'&&!isCapabilityEnabled('cloud-edge'))return goNav(parentId);
+  state.expandedNav={gateway:false,'cloud-edge':false};
+  state.expandedNav[parentId]=true;
+  state.activeNav=parentId;state.appId=null;state.compId=null;state.workloadId=null;
+  if(parentId==='cloud-edge'){
+    state.view='cloud-edge';
+    edgeActiveTab=childId;
+  }else{
+    state.view='gateway';
+    state.gatewayTab=childId;
+  }
+  render();
+}
 function renderSidebar(){
   const menu = [
     { id:'apps', name:'应用', icon:ico.apps, group:'应用中心' },
@@ -1476,9 +1537,9 @@ function renderSidebar(){
     { id:'architecture', name:'架构关系', icon:ico.mesh, group:'应用中心' },
     { id:'capabilities', name:'能力中心', icon:ico.components, group:'平台' },
     { id:'mesh', name:'服务网格', icon:ico.mesh, group:'平台', capability:'service-mesh' },
-    { id:'gateway', name:'网关与路由', icon:ico.gateway, group:'平台' },
+    { id:'gateway', name:'网关与路由', icon:ico.gateway, group:'平台', submenu:SIDEBAR_SUBMENUS.gateway },
     { id:'cluster', name:'集群', icon:ico.cluster, group:'平台' },
-    { id:'cloud-edge', name:'云边端协同', icon:ico.cloud, group:'平台', capability:'cloud-edge' },
+    { id:'cloud-edge', name:'云边端协同', icon:ico.cloud, group:'平台', capability:'cloud-edge', submenu:SIDEBAR_SUBMENUS['cloud-edge'] },
     { id:'secrets', name:'配置中心', icon:ico.secrets, group:'平台' },
     { id:'releases', name:'发布中心', icon:ico.workloads, group:'平台' },
     { id:'terminals', name:'终端会话', icon:ico.monitor, group:'平台' },
@@ -1497,10 +1558,16 @@ function renderSidebar(){
       else if (state.view === 'workloads' || state.view === 'workload') isActive = (item.id === 'workloads');
       else if (state.view === 'architecture') isActive = (item.id === 'architecture');
       else isActive = (state.view === item.id);
-      
-      html += `<div class="nav-item ${isActive ? 'active' : ''}" onclick="goNav('${item.id}')">
-        <span class="ico">${item.icon}</span>${item.name}
+      const expanded=!!item.submenu&&sidebarGroupExpanded(item.id);
+      html += `<div class="nav-cluster ${expanded?'expanded':''}">`;
+      html += `<div class="nav-item ${isActive?'active':''} ${item.submenu?'nav-parent':''}" data-nav-id="${item.id}" onclick="goNav('${item.id}')">
+        <span class="ico">${item.icon}</span><span class="nav-label">${item.name}</span>
+        ${item.submenu?`<button type="button" class="nav-toggle" aria-label="${expanded?'收起':'展开'}${item.name}子菜单" aria-expanded="${expanded}" onclick="event.stopPropagation();toggleSidebarGroup('${item.id}')">${ico.arrowRight}</button>`:''}
       </div>`;
+      if(item.submenu){
+        html += `<div class="nav-submenu ${expanded?'open':''}" data-submenu="${item.id}">${item.submenu.map(child=>`<button type="button" class="nav-subitem ${sidebarChildActive(item.id,child.id)?'active':''}" data-child-id="${child.id}" aria-current="${sidebarChildActive(item.id,child.id)?'page':'false'}" onclick="goSidebarChild('${item.id}','${child.id}')">${child.name}</button>`).join('')}</div>`;
+      }
+      html += `</div>`;
     });
   }
   document.getElementById('sidebar').innerHTML = html;
@@ -3954,6 +4021,9 @@ function goNav(target){
   }
   state.activeNav = target;
   state.view = target;
+  state.expandedNav={gateway:target==='gateway','cloud-edge':target==='cloud-edge'};
+  if(target==='cloud-edge')edgeActiveTab='overview';
+  if(target==='gateway')state.gatewayTab='route';
   state.appId = null; state.compId = null; if(target!=='workload')state.workloadId=null;
   if(target === 'apps') state.view = 'apps';
   render();
